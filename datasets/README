@@ -1,0 +1,7 @@
+This is a folder containing two datasets that is going to download from SOSD:
+https://dataverse.harvard.edu/dataset.xhtml?persistentId=doi:10.7910/DVN/JGVF9A&version=10.0
+
+They are wiki_ts_200M_uint64.zst
+fb_200M_uint64.zst
+
+README is for place holder.
