@@ -8,10 +8,10 @@ if [ $ubuntu_version == "18.04" ]; then
   mv MLNX_OFED_LINUX-4.9-5.1.0.0-ubuntu18.04-x86_64.tgz ofed.tgz
 elif [ $ubuntu_version == "20.04" ]; then
   # wget https://content.mellanox.com/ofed/MLNX_OFED-23.10-3.2.2.0/MLNX_OFED_LINUX-23.10-3.2.2.0-ubuntu20.04-x86_64.tgz
-  # wget https://content.mellanox.com/ofed/MLNX_OFED-24.04-0.7.0.0/MLNX_OFED_LINUX-24.04-0.7.0.0-ubuntu20.04-x86_64.tgz
-  wget https://content.mellanox.com/ofed/MLNX_OFED-4.9-5.1.0.0/MLNX_OFED_LINUX-4.9-5.1.0.0-ubuntu20.04-x86_64.tgz
-  mv MLNX_OFED_LINUX-4.9-5.1.0.0-ubuntu20.04-x86_64.tgz ofed.tgz
-  # mv MLNX* ofed.tgz
+  wget https://content.mellanox.com/ofed/MLNX_OFED-24.04-0.7.0.0/MLNX_OFED_LINUX-24.04-0.7.0.0-ubuntu20.04-x86_64.tgz
+  # wget https://content.mellanox.com/ofed/MLNX_OFED-4.9-5.1.0.0/MLNX_OFED_LINUX-4.9-5.1.0.0-ubuntu20.04-x86_64.tgz
+  # mv MLNX_OFED_LINUX-4.9-5.1.0.0-ubuntu20.04-x86_64.tgz ofed.tgz
+  mv MLNX* ofed.tgz
 else
   echo "Wrong ubuntu distribution for $mode!"
   exit 0
