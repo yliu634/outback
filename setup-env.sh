@@ -19,7 +19,7 @@ fi
 echo $mode $ubuntu_version $ofed_fid
 
 sudo apt update -y
-sudo apt -y install g++ cmake clang sysstat zstd libtbb-dev libgtest-dev libboost-all-dev google-perftools libgoogle-perftools-dev cmake build-essential pkgconf gdb libssl-dev tmux liblua5.3-dev libgflags-dev libmemcached-dev libmemcached-tools memcached libnuma-dev linux-tools-common linux-tools-$(uname -r)
+sudo apt -y install g++ cmake pip clang sysstat zstd libtbb-dev libgtest-dev libboost-all-dev google-perftools libgoogle-perftools-dev cmake build-essential pkgconf gdb libssl-dev tmux liblua5.3-dev libgflags-dev libmemcached-dev libmemcached-tools memcached libnuma-dev linux-tools-common linux-tools-$(uname -r)
 
 # install anaconda
 mkdir install
