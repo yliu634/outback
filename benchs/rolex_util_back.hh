@@ -39,7 +39,6 @@ struct __attribute__((packed)) ReplyValue {
 struct alignas(CACHELINE_SIZE) ThreadParam {
     uint64_t throughput;
     uint32_t thread_id;
-    double latency;
 };
 using thread_param_t = ThreadParam;
 

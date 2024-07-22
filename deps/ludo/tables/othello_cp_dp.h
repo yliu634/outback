@@ -464,7 +464,7 @@ public:
   /// \param targetCapacity the target capacity
   /// \note Side effect: will change nKeysInOthello, and if hash size is changed, a rebuild is performed
   void resizeCapacity(uint32_t targetCapacity, bool forceBuild = false, bool skipBuild = false) {
-    targetCapacity = max(nKeysInOthello, max(targetCapacity, 256U));
+    targetCapacity = max(nKeysInOthello, max(targetCapacity, 256U)); //work
     
     uint64_t nextMb;
     
@@ -587,7 +587,7 @@ public:
       if (DoNotRebuild) {
         result.status = -2;
       } else {
-        resizeCapacity(nKeysInOthello * 4, true); // change by me, * 2 at first
+        resizeCapacity(3 * nKeysInOthello * 2/2, true); // it was: nKeysInOthello * 2, but I change it to 3.
         result = insert(k, v, false);
         if (result.status < 0) throw runtime_error("impossible");
         result.status = 2;

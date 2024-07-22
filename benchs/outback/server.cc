@@ -1,6 +1,5 @@
 #include <iostream>
 #include <stdexcept>
-#include <gflags/gflags.h>
 
 #include "rlib/core/lib.hh"                   /// logging, RNicInfo
 #include "r2/src/thread.hh"                   /// Thread
@@ -18,7 +17,6 @@ using namespace outback;
 using XThread = ::r2::Thread<usize>;
 
 #define DEBUG_MODE_CHECK 0
-
 auto setup_ludo_table() -> bool;
 auto rolex_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<XThread>>;
 
@@ -33,8 +31,7 @@ int main(int argc, char **argv) {
   LOG(2) << "[Server setup ludo table] ...";
   setup_ludo_table();
 
-  std::vector<std::unique_ptr<XThread>> workers = 
-        rolex_server_workers(FLAGS_mem_threads);
+  std::vector<std::unique_ptr<XThread>> workers = rolex_server_workers(FLAGS_mem_threads);
 
   ctrl.start_daemon();
 
@@ -60,7 +57,6 @@ int main(int argc, char **argv) {
   LOG(4) << "rpc server finishes";
   return 0;
 }
-
 
 auto rolex_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<XThread>>{
   std::vector<std::unique_ptr<XThread>> res;
@@ -118,7 +114,6 @@ auto rolex_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<
         r2::compile_fence();
         rpc.recv_event_loop(&recv);
       }
-
       return 0;
     })));
   }
@@ -127,8 +122,8 @@ auto rolex_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<
 
 auto setup_ludo_table() -> bool {
   packed_data = new packed_data_t(2*FLAGS_nkeys);
-  lru_cache = new lru_cache_t(2048,10);
-  ludo_maintenance_t ludo_maintenance_unit(1024);
+  lru_cache = new lru_cache_t(FLAGS_cache_size, FLAGS_cache_size/10);
+  ludo_maintenance_t ludo_maintenance_unit(FLAGS_nkeys);
   for (uint64_t i = 0; i < FLAGS_nkeys; i++) {
     KeyType key = exist_keys[i];
     V addr = packed_data->bulk_load_data(key, sizeof(V), i);
@@ -140,8 +135,9 @@ auto setup_ludo_table() -> bool {
   ludo_lookup_unit = new ludo_lookup_t(ludo_maintenance_unit);
   ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit, ludo_buckets);
   mutexArray = new std::mutex[ludo_lookup_unit->getBucketsNum()];
+  bucketLocks.resize(ludo_lookup_unit->getBucketsNum(),0);
   LOG(2) << "Ludo slots finished up...";
-
+  
   #if DEBUG_MODE_CHECK
   for (uint64_t i = 0; i < 100; i++) {
     V dummy_value;

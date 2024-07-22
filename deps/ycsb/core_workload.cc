@@ -92,7 +92,7 @@ void CoreWorkload::Init(
   double read_proportion = std::stod(READ_PROPORTION_DEFAULT);
   double update_proportion = std::stod(UPDATE_PROPORTION_DEFAULT);
   double insert_proportion = std::stod(INSERT_PROPORTION_DEFAULT);
-  double zipfian_const = _zipfian_const;    //ZIPFIAN_CONST_DEFAULT);
+  double zipfian_const = _zipfian_const;//ZIPFIAN_CONST_DEFAULT);
   double scan_proportion = std::stod(SCAN_PROPORTION_DEFAULT);
   double readmodifywrite_proportion = std::stod(READMODIFYWRITE_PROPORTION_DEFAULT);
   

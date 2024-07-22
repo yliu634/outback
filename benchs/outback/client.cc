@@ -19,7 +19,6 @@ using namespace outback;
 
 volatile bool running;
 std::atomic<size_t> ready_threads(0);
-
 auto setup_ludo_table() -> bool;
 
 namespace outback {
@@ -27,9 +26,9 @@ namespace outback {
 void run_benchmark(size_t sec);
 void* rolex_client_worker(void* param);
 
-auto remote_search(const KeyType& key, RPC& rpc, UDTransport& sender, const rmem::mr_key_t& lkey, R2_ASYNC) -> ::r2::Option<ValType>;
-void remote_put(const KeyType& key, const ValType& val, RPC& rpc, UDTransport& sender, R2_ASYNC);
-void remote_update(const KeyType& key, const ValType& val, RPC& rpc, UDTransport& sender, R2_ASYNC);
+auto remote_search(const KeyType& key, RPC& rpc, UDTransport& sender, const rmem::mr_key_t& lkey, R2_ASYNC) -> ::r2::Option<ReplyValue>;
+auto remote_put(const KeyType& key, const ValType& val, RPC& rpc, UDTransport& sender, R2_ASYNC) -> ::r2::Option<ReplyValue>;
+auto remote_update(const KeyType& key, const ValType& val, RPC& rpc, UDTransport& sender, R2_ASYNC) -> ::r2::Option<ReplyValue>;
 void remote_remove(const KeyType& key, RPC& rpc, UDTransport& sender, R2_ASYNC);
 void remote_scan(const KeyType& key, const u64& n, RPC& rpc, UDTransport& sender, R2_ASYNC);
 }
@@ -52,7 +51,7 @@ int main(int argc, char **argv) {
 
 
 auto setup_ludo_table() -> bool {
-  ludo_maintenance_t ludo_maintenance_unit(1024);
+  ludo_maintenance_t ludo_maintenance_unit(FLAGS_nkeys);
   for (uint64_t i = 0; i < FLAGS_nkeys; i++) {
     ludo_maintenance_unit.insert(exist_keys[i], i);
   }
@@ -73,62 +72,57 @@ auto setup_ludo_table() -> bool {
       }
     }
   #endif
-  exist_keys.clear();
   return true;
 }
 
 namespace outback {
 
 void run_benchmark(size_t sec) {
-  pthread_t threads[BenConfig.threads];
-  thread_param_t thread_params[BenConfig.threads];
-  // check if parameters are cacheline aligned
-  for (size_t i = 0; i < BenConfig.threads; i++) {
-    ASSERT ((uint64_t)(&(thread_params[i])) % CACHELINE_SIZE == 0) <<
-        "wrong parameter address: " << &(thread_params[i]);
-  }
-
-  running = false;
-  for(size_t worker_i = 0; worker_i < BenConfig.threads; worker_i++){
-    thread_params[worker_i].thread_id = worker_i;
-    thread_params[worker_i].throughput = 0;
-    thread_params[worker_i].latency = 0;
-    int ret = pthread_create(&threads[worker_i], nullptr, rolex_client_worker,
-                            (void *)&thread_params[worker_i]);
-    ASSERT (ret==0) <<"Error:" << ret;
-  }
-
-  LOG(2)<<"[Wait for Connection] ...";
-  while (ready_threads < BenConfig.threads) sleep(0.3);
-
-  running = true;
-  std::vector<size_t> tput_history(BenConfig.threads, 0);
-  size_t current_sec = 0;
-  while (current_sec < sec) {
-    sleep(1);
-    uint64_t tput = 0;
-    double tlat = 0; // for latency, as well as in many workers modificaiton.
+    pthread_t threads[BenConfig.threads];
+    thread_param_t thread_params[BenConfig.threads];
+    // check if parameters are cacheline aligned
     for (size_t i = 0; i < BenConfig.threads; i++) {
-      tput += thread_params[i].throughput - tput_history[i];
-      tput_history[i] = thread_params[i].throughput;
-      tlat += thread_params[i].latency; // for latency
-      thread_params[i].latency = 0;     //for latency
+        ASSERT ((uint64_t)(&(thread_params[i])) % CACHELINE_SIZE == 0) <<
+            "wrong parameter address: " << &(thread_params[i]);
     }
-    LOG(2)<<"[micro] >>> sec " << current_sec << " throughput: " << tput << ", latency: " << tlat/tput << "us";
-    ++current_sec;
-  }
-  
-  running = false;
-  void *status;
-  for (size_t i = 0; i < BenConfig.threads; i++) {
-    int rc = pthread_join(threads[i], &status);
-    ASSERT (!rc) "Error:unable to join," << rc;
-  }
-  size_t throughput = 0;
-  for (auto &p : thread_params) {
-    throughput += p.throughput;
-  }
-  LOG(2)<<"[micro] Throughput(op/s): " << throughput / sec;
+
+    running = false;
+    for(size_t worker_i = 0; worker_i < BenConfig.threads; worker_i++){
+        thread_params[worker_i].thread_id = worker_i;
+        thread_params[worker_i].throughput = 0;
+        int ret = pthread_create(&threads[worker_i], nullptr, rolex_client_worker,
+                                (void *)&thread_params[worker_i]);
+        ASSERT (ret==0) <<"Error:" << ret;
+    }
+
+    LOG(2)<<"[Wait for Connection] ...";
+    while (ready_threads < BenConfig.threads) sleep(0.3);
+
+    running = true;
+    std::vector<size_t> tput_history(BenConfig.threads, 0);
+    size_t current_sec = 0;
+    while (current_sec < sec) {
+        sleep(1);
+        uint64_t tput = 0;
+        for (size_t i = 0; i < BenConfig.threads; i++) {
+            tput += thread_params[i].throughput - tput_history[i];
+            tput_history[i] = thread_params[i].throughput;
+        }
+        LOG(2)<<"[micro] >>> sec " << current_sec << " throughput: " << tput;
+        ++current_sec;
+    }
+    
+    running = false;
+    void *status;
+    for (size_t i = 0; i < BenConfig.threads; i++) {
+        int rc = pthread_join(threads[i], &status);
+        ASSERT (!rc) "Error:unable to join," << rc;
+    }
+    size_t throughput = 0;
+    for (auto &p : thread_params) {
+        throughput += p.throughput;
+    }
+    LOG(2)<<"[micro] Throughput(op/s): " << throughput / sec;
 }
 
 void* rolex_client_worker(void* param) {
@@ -222,7 +216,7 @@ void* rolex_client_worker(void* param) {
    * @brief using coroutines for testing
    * 
    */ 
-  if(bench::BenConfig.workloads >= YCSB_A){ //NORMAL) {
+  if(bench::BenConfig.workloads >= YCSB_A) { //NORMAL
     for(int i=0; i<BenConfig.coros; i++) {
       ssched.spawn([send_buf, &rpc, &sender, &recv_s, lkey, 
                     thread_id, &thread_param,
@@ -230,39 +224,26 @@ void* rolex_client_worker(void* param) {
                     &query_i, &insert_i, &remove_i, &update_i](R2_ASYNC) {
         char reply_buf[1024];
         RPCOp op;
-        std::chrono::microseconds duration(0);
         while(running) {
           double d = ratio_dis(gen);
-          if(d <= BenConfig.read_ratio) {                                         // search
-            KeyType dummy_key = bench_keys[query_i];      // latency start;
-            auto start_time = std::chrono::high_resolution_clock::now();    
+          if(d <= BenConfig.read_ratio) {                                       // search
+            KeyType dummy_key = bench_keys[query_i]; // ;
             auto res = remote_search(dummy_key, rpc, sender, lkey, R2_ASYNC_WAIT);
-            auto end_time = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
             query_i++;
-            if (unlikely(query_i == bench_keys.size())) {
-              query_i = 0;
-            }
+            if (unlikely(query_i == bench_keys.size())) query_i = 0;
+            if (!res.value().status) continue;
           } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) {             // insert
             KeyType dummy_key = nonexist_keys[insert_i];
-            auto start_time = std::chrono::high_resolution_clock::now(); 
-            remote_put(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
-            auto end_time = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+            auto res = remote_put(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
             insert_i++;
-            if (unlikely(insert_i == nonexist_keys.size())) {
-              insert_i = 0;
-            }
+            if (unlikely(insert_i == nonexist_keys.size())) insert_i = 0;
+            if (!res.value().status) continue;
           } else if(d<=BenConfig.read_ratio+BenConfig.insert_ratio+BenConfig.update_ratio) { // update
             KeyType dummy_key = bench_keys[update_i];
-            auto start_time = std::chrono::high_resolution_clock::now(); 
-            remote_update(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
-            auto end_time = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+            auto res = remote_update(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
             update_i++;
-            if (unlikely(update_i == bench_keys.size())) {
-              update_i = 0;
-            }
+            if (unlikely(update_i == bench_keys.size())) update_i = 0;
+            if (!res.value().status) continue;
           } else {
             KeyType dummy_key = bench_keys[remove_i];
             remote_remove(dummy_key, rpc, sender, R2_ASYNC_WAIT);
@@ -272,45 +253,6 @@ void* rolex_client_worker(void* param) {
             }
           }
           thread_param.throughput++;
-          thread_param.latency += static_cast<double>(duration.count());
-        }
-        if (R2_COR_ID() == BenConfig.coros) {
-          R2_STOP();
-        }
-        R2_RET;
-      });
-    }
-  }
-  else {  //YCSB
-    for(int i=0; i<BenConfig.coros; i++) {
-      ssched.spawn([send_buf, &rpc, &sender, &recv_s, lkey, 
-                    thread_id, &thread_param,
-                    &ratio_dis, &gen,
-                    &query_i, &insert_i, &remove_i, &update_i](R2_ASYNC) {
-        char reply_buf[1024];
-        RPCOp op;
-        std::chrono::microseconds duration(0);
-        while(running) {
-          double d = ratio_dis(gen);
-          //KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
-          if(d <= BenConfig.read_ratio) {     // search
-            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
-            auto start_time = std::chrono::high_resolution_clock::now();    
-            auto res = remote_search(dummy_key, rpc, sender, lkey, R2_ASYNC_WAIT);
-            auto end_time = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-          } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) { // insert
-            KeyType dummy_key = std::stoull(workload.NextSequenceKey().substr(4));
-            remote_put(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
-          } else if(d<=BenConfig.read_ratio+BenConfig.insert_ratio+BenConfig.update_ratio) { // update
-            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
-            remote_update(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
-          } else {
-            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
-            remote_remove(dummy_key, rpc, sender, R2_ASYNC_WAIT);
-          }
-          thread_param.throughput++;
-          thread_param.latency += static_cast<double>(duration.count());
         }
         if (R2_COR_ID() == BenConfig.coros) {
           R2_STOP();

@@ -254,7 +254,7 @@ void fasst_put_callback(const Header& rpc_header, const MemBlock& args, SendTrai
   uint16_t dummy_key_tag = *args.interpret_as<uint16_t>(sizeof(uint32_t));
   ValType dummy_value = *args.interpret_as<ValType>(sizeof(uint32_t)+sizeof(uint16_t));
 	// PUT
-  //std::unique_lock<std::mutex> lock(_mutex);
+  std::unique_lock<std::mutex> lock(_mutex);
   // read data value from it
   mica_resp* respq = (mica_resp*) malloc(sizeof(mica_resp));
   //mica_op* opq = (mica_op*) malloc(sizeof(mica_op));
@@ -266,7 +266,7 @@ void fasst_put_callback(const Header& rpc_header, const MemBlock& args, SendTrai
   op->key.bkt=dummy_key_bkt;
   op->key.tag=dummy_key_tag;
   mica_batch_op(kv, 1, &op, respq);
-  //lock.unlock();
+  lock.unlock();
 
 	ReplyValue reply;
 	// send
@@ -291,7 +291,7 @@ void fasst_update_callback(const Header& rpc_header, const MemBlock& args, SendT
   ValType dummy_value = *args.interpret_as<ValType>(sizeof(uint32_t)+sizeof(uint16_t));
   
 	// UPDATE
-  //std::unique_lock<std::mutex> lock(_mutex);
+  std::unique_lock<std::mutex> lock(_mutex);
   mica_resp* respq = (mica_resp*) malloc(sizeof(mica_resp));
   //mica_op* opq = (mica_op*) malloc(sizeof(mica_op));
   //memcpy(opq, op, sizeof(op));
@@ -302,7 +302,7 @@ void fasst_update_callback(const Header& rpc_header, const MemBlock& args, SendT
   op->key.bkt=dummy_key_bkt;
   op->key.tag=dummy_key_tag;
   mica_batch_op(kv, 1, &op, respq);
-  //lock.unlock();
+  lock.unlock();
 
   bool res(true);
 	ReplyValue reply;

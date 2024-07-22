@@ -121,7 +121,6 @@ class Cache {
     if (iter != cache_.end()) {
       iter->second->value = v;
       keys_.splice(keys_.begin(), keys_, iter->second);
-      return;
     }
 
     keys_.emplace_front(k, std::move(v));

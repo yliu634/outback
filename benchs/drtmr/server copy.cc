@@ -211,17 +211,9 @@ auto drtmr_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<
   return std::move(res);
 }
 
-inline void test(const Header& rpc_header, const MemBlock& args, SendTrait* replyc, ReplyValue &reply) {
-  char reply_buf[64];
-  RPCOp op;
-  ASSERT(op.set_msg(MemBlock(reply_buf, 64)).set_reply().add_arg(reply));
-  op.set_corid(rpc_header.cor_id);
-  // LOG(3)<<"GET: " << *(args.interpret_as<u64>());
-  ASSERT(op.execute(replyc) == IOCode::Ok);
-}
 
-ReplyValue test_find(const Header& rpc_header, const MemBlock& args, SendTrait* replyc) {
-  // sanity check the requests
+void drtmr_get_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc) {
+	// sanity check the requests
   ASSERT(args.sz == sizeof(KeyType));
   KeyType key = *(reinterpret_cast<KeyType*>(args.mem_ptr));
 	// GET
@@ -242,13 +234,6 @@ ReplyValue test_find(const Header& rpc_header, const MemBlock& args, SendTrait* 
   } else {
     reply = { .status = false, .val = dummy_value };
   }
-  return std::move(reply);
-}
-
-void drtmr_get_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc) {
-	ReplyValue reply = test_find(rpc_header,args,replyc);
-  test(rpc_header, args, replyc,reply);
-  /*
   // send
   char reply_buf[64];
   RPCOp op;
@@ -256,7 +241,6 @@ void drtmr_get_callback(const Header& rpc_header, const MemBlock& args, SendTrai
   op.set_corid(rpc_header.cor_id);
   // LOG(3)<<"GET: " << *(args.interpret_as<u64>());
   ASSERT(op.execute(replyc) == IOCode::Ok);
-  */
 }
 
 

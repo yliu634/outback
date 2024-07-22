@@ -1,5 +1,6 @@
 #pragma once
 
+#include <gflags/gflags.h>
 #include "r2/src/common.hh"
 #include "r2/src/logging.hh"                  /// logging
 #include "r2/src/thread.hh"                   /// Thread
@@ -7,6 +8,7 @@
 
 #include "rlib/core/lib.hh"
 #include "rlib/core/rctrl.hh"                 /// RCtrl
+#include "rlib/core/qps/op.hh"
 #include "rlib/core/common.hh"
 #include "rlib/core/naming.hh"                /// DevIdx 
 #include "rlib/core/nicinfo.hh"               /// RNicInfo
@@ -28,8 +30,12 @@
 #include "outback/ludo_seed.hh"
 #include "benchs/rolex_util_back.hh"
 
+using namespace r2;
 using namespace rdmaio;
+using namespace rdmaio::rmem;
+using namespace rdmaio::qp;
 using namespace xstore;
+using namespace xstore::util;
 
 namespace outback {
 

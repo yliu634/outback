@@ -232,7 +232,6 @@ class RecvChannel : public AbsChannel {
 
     char host[256];
     for (p = servinfo; p != NULL; p = p->ai_next) {
-
       if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) ==
           -1) {
         continue;
@@ -244,7 +243,6 @@ class RecvChannel : public AbsChannel {
         continue;
       }
       //RDMA_LOG(2) << "choose host : " << host;
-
       break;
     }
     if (p == nullptr)
