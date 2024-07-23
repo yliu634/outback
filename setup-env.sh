@@ -36,6 +36,7 @@ fi
 cd ofed
 sudo ./mlnxofedinstall --force
 sudo /etc/init.d/openibd restart
+sudo /etc/init.d/opensmd restart
 cd ..
 
 # install cmake
