@@ -9,8 +9,8 @@ if [ $ubuntu_version == "18.04" ]; then
 elif [ $ubuntu_version == "20.04" ]; then
   # wget https://content.mellanox.com/ofed/MLNX_OFED-23.10-3.2.2.0/MLNX_OFED_LINUX-23.10-3.2.2.0-ubuntu20.04-x86_64.tgz
   # wget https://content.mellanox.com/ofed/MLNX_OFED-24.04-0.7.0.0/MLNX_OFED_LINUX-24.04-0.7.0.0-ubuntu20.04-x86_64.tgz
-  wget https://content.mellanox.com/ofed/MLNX_OFED-4.9-5.1.0.0/MLNX_OFED_LINUX-4.9-5.1.0.0-ubuntu20.04-x86_64.tgz
   # wget https://content.mellanox.com/ofed/MLNX_OFED-5.8-5.1.1.2/MLNX_OFED_LINUX-5.8-5.1.1.2-ubuntu20.04-x86_64.tgz
+  wget https://content.mellanox.com/ofed/MLNX_OFED-4.9-5.1.0.0/MLNX_OFED_LINUX-4.9-5.1.0.0-ubuntu20.04-x86_64.tgz
   mv MLNX_OFED_LINUX-4.9-5.1.0.0-ubuntu20.04-x86_64.tgz ofed.tgz
   # mv MLNX* ofed.tgz
 else
@@ -20,7 +20,7 @@ fi
 echo $mode $ubuntu_version $ofed_fid
 
 sudo apt update -y
-sudo apt -y install g++ cmake pip clang sysstat zstd libtbb-dev libgtest-dev libboost-all-dev google-perftools libgoogle-perftools-dev cmake build-essential pkgconf gdb libssl-dev tmux liblua5.3-dev libgflags-dev libmemcached-dev libmemcached-tools memcached libnuma-dev linux-tools-common linux-tools-$(uname -r)
+sudo apt -y install g++ cmake clang python-pip sysstat zstd libtbb-dev libgtest-dev libboost-all-dev google-perftools libgoogle-perftools-dev cmake build-essential pkgconf gdb libssl-dev tmux liblua5.3-dev libgflags-dev libmemcached-dev libmemcached-tools memcached libnuma-dev linux-tools-common linux-tools-$(uname -r)
 
 # install anaconda
 mkdir install
