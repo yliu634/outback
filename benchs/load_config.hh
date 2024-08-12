@@ -21,12 +21,11 @@ DEFINE_uint64(non_nkeys, 1, "Number of non_keys for inserting");
 DEFINE_uint64(bench_nkeys, 1, "Number of operations benchmarked for test");
 DEFINE_string(workloads, "normal", "The workloads for evaluation");
 DEFINE_string(dists, "uniform", "The request keys distribution only for ycsb");
-DEFINE_double(zip_const, 0.99, "The default zipfian dist for skewness, only work when zipfian");
+DEFINE_double(zip_const, 0.99, "The default zipfian dist for skewness");
 
 // test config
 DEFINE_uint64(mem_threads, 1, "Server threads.");
 DEFINE_uint64(threads, 2, "Client threads.");
-DEFINE_uint64(cache_size, 1ULL<<17, "Number of cache size on server side.");
 DEFINE_int32(coros, 2, "num client coroutine used per threads");
 DEFINE_double(read_ratio, 1, "The ratio for reading");
 DEFINE_double(insert_ratio, 0, "The ratio for writing");

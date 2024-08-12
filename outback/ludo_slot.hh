@@ -72,7 +72,7 @@ public:
         return 3;
     }
 
-    auto read_addr(size_t row, uint8_t slot) -> AddrType {
+    auto inline read_addr(size_t row, uint8_t slot) -> AddrType {
         AddrType addr = toAddr(bucketsArray[row].slots[slot]);
         return std::move(addr);
     }

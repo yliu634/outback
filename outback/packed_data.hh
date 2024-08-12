@@ -17,7 +17,7 @@ struct __attribute__((packed)) PackedStruct {
 template<typename KeyType = uint64_t, typename ValType = uint64_t>
 class PackedData {
     using packed_struct_t = PackedStruct<KeyType, ValType>;
-    #define ARRAY_LENGTH 20000
+    //#define ARRAY_LENGTH 20000
 public:
     packed_struct_t* rawArray;
     explicit PackedData(size_t numElements_): numElements(numElements_), num(0) {
@@ -35,12 +35,12 @@ public:
         }
     }
 
-    auto read_key(size_t num, KeyType& key) -> uint32_t {
+    auto inline read_key(size_t num, KeyType& key) -> uint32_t {
         key = rawArray[num].key;
         return 0;
     }
 
-    auto read_data(size_t num, ValType& val) -> uint32_t {
+    auto inline read_data(size_t num, ValType& val) -> uint32_t {
         val = rawArray[num].data;
         return rawArray[num].data_length;
     }
@@ -137,7 +137,7 @@ public:
 private:
     std::atomic<size_t> num;
     const size_t numElements;
-    std::mutex mutexArray[ARRAY_LENGTH];
+    //std::mutex mutexArray[ARRAY_LENGTH];
 
 };
 

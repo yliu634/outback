@@ -27,7 +27,7 @@ using SManager = UDSessionManager<2048>;
 using RPC = RPCCore<SendTrait, RecvTrait, SManager>;
 
 auto remote_search(const KeyType& key, RPC& rpc, UDTransport& sender, 
-                    const rmem::mr_key_t& lkey, R2_ASYNC) -> ::r2::Option<ReplyValue>
+                    const rmem::mr_key_t& lkey, R2_ASYNC) -> ::r2::Option<ValType>
 {
   char send_buf[64];    // give a try to 32?
   char reply_buf[sizeof(ReplyValue)];
@@ -56,14 +56,14 @@ auto remote_search(const KeyType& key, RPC& rpc, UDTransport& sender,
 
   // check the rest
   ReplyValue r = *(reinterpret_cast<ReplyValue*>(reply_buf));
-  //if (r.status) {
-  //  return (ValType)r.val;
-  //}
-  return r;
+  if (r.status) {
+    return (ValType)r.val;
+  }
+  return {};
 }
 
-auto remote_put(const KeyType& key, const ValType& val, RPC& rpc, 
-                UDTransport& sender, R2_ASYNC) -> ::r2::Option<ReplyValue>
+void remote_put(const KeyType& key, const ValType& val, RPC& rpc, 
+                UDTransport& sender, R2_ASYNC)
 {
   std::string data;
   auto loc = ludo_lookup_unit->lookup_slot(key);
@@ -102,11 +102,10 @@ auto remote_put(const KeyType& key, const ValType& val, RPC& rpc,
     std::thread polling_thread(remote_fetch_seeds);
     polling_thread.detach();
   }
-  return r;  
 }
 
-auto remote_update(const KeyType& key, const ValType& val, RPC& rpc, 
-                    UDTransport& sender, R2_ASYNC) -> ::r2::Option<ReplyValue>
+void remote_update(const KeyType& key, const ValType& val, RPC& rpc, 
+                    UDTransport& sender, R2_ASYNC)
 {
   std::string data;
   auto loc = ludo_lookup_unit->lookup_slot(key);
@@ -131,7 +130,7 @@ auto remote_update(const KeyType& key, const ValType& val, RPC& rpc,
   R2_PAUSE_AND_YIELD;
 
   ReplyValue r = *(reinterpret_cast<ReplyValue*>(reply_buf));
-  return r;
+
 }
 
 void remote_remove(const KeyType& key, RPC& rpc, UDTransport& sender, R2_ASYNC)

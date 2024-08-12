@@ -42,6 +42,7 @@
 class RdmaClusterHash {
 
  public:
+  std::mutex* mutexArray;
   struct HeaderNode {
     uint64_t next;
     uint64_t keys[CLUSTER_H];
@@ -62,7 +63,7 @@ class RdmaClusterHash {
   uint64_t size;
   uint64_t free_indirect;
   uint64_t free_data;
-  // starting addr allocated, number of keys, value length (bits?). I think it's bytes anyway
+  // starting addr allocated, number of keys, value length (bits?).
   RdmaClusterHash(char* arr, uint64_t len, uint64_t esize=64){
     entrysize = (((esize-1)>>3)+1) <<3;
     length = len;
@@ -75,6 +76,7 @@ class RdmaClusterHash {
     data_size =(sizeof(DataNode)+entrysize);
     size = indirect_length * header_size +  length * data_size;
     array=arr;
+    mutexArray=new std::mutex[Logical_length];
   }
 
   ~RdmaClusterHash(){
@@ -136,6 +138,7 @@ class RdmaClusterHash {
       assert(false);
     }
     uint64_t hash = GetHash(key);
+    std::unique_lock<std::mutex> lock(mutexArray[hash]);
     HeaderNode * node =(HeaderNode *)(array+hash*header_size);
     while(node->next !=0){
       node =(HeaderNode *)(array+(node->next)*header_size);
@@ -148,6 +151,7 @@ class RdmaClusterHash {
         node->keys[i]=key;
         node->indexes[i]=free_data;
         free_data ++;
+        lock.unlock();
         return;
       }
     }
@@ -164,7 +168,32 @@ class RdmaClusterHash {
     node->keys[0]=key;
     node->indexes[0]=free_data;
     free_data ++;
+    lock.unlock();
     return;
+  }
+
+  void Update(uint64_t key, void* val) {
+    uint64_t hash = GetHash(key);
+    std::unique_lock<std::mutex> lock(mutexArray[hash]);
+    HeaderNode * node =(HeaderNode *) (array+hash*header_size);
+    while(true){
+      for(int i=0;i<CLUSTER_H;i++){
+        if(node->keys[i]==key && node->indexes[i]!=0){
+          DataNode* datanode=getDataNode(node->indexes[i]);
+          *((uint64_t *)(datanode+1)) = *((uint64_t *)(val));
+          lock.unlock();
+          return;
+        }
+      }
+      if(node->next !=0)
+	      node = (HeaderNode *)(array+(node->next)*header_size);
+      else{
+        lock.unlock();
+	      return;
+      }
+    }
+    lock.unlock();
+    return; //return nullptr;
   }
 
   uint64_t* Get(uint64_t key) {
@@ -193,15 +222,15 @@ class RdmaClusterHash {
     while(true){
       count++;
       for(int i=0;i<CLUSTER_H;i++){
-	if(node->keys[i]==key && node->indexes[i]!=0){
-	  DataNode* datanode=getDataNode(node->indexes[i]);
-	  return count;
-	}
+        if(node->keys[i]==key && node->indexes[i]!=0){
+          DataNode* datanode=getDataNode(node->indexes[i]);
+          return count;
+	      }
       }
       if(node->next !=0)
-	node = (HeaderNode *) (array+(node->next)*header_size);
+        node = (HeaderNode *) (array+(node->next)*header_size);
       else{
-	assert(false);
+        assert(false);
       }
     }
   }

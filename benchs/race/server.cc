@@ -19,6 +19,7 @@
 DEFINE_int64(use_nic_idx, 0, "Which NIC to create QP");
 DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
+
 DEFINE_int64(magic_num, 0x6e, "The magic number read by the client");
 
 using namespace rdmaio;
@@ -117,7 +118,7 @@ int main(int argc, char **argv) {
     //ctrl->registered_mrs.create_then_reg( // 0 is the name not idx
     //  FLAGS_reg_mem_name, leaf_region->convert_to_rmem().value(), ctrl->opened_nics.query(0).value());
 
-    RDMA_LOG(2) << "registered memory start addr is: " << (u64) reg_mem;
+    RDMA_LOG(2) << "registered memory start addr is: " << (u64) reg_mem; // reinterpret_cast<u64>(leaf_region.get());
     
     
     // setup the value

@@ -86,7 +86,7 @@ public:
   // 0.94 is achievable, but 0.85 is faster and keeps the code simple
   // at the cost of a small amount of memory.
   // NOTE:  0 < kLoadFactor <= 1.0
-  static constexpr double kLoadFactor = 0.90;
+  static constexpr double kLoadFactor = 0.95;
   
   // Cuckoo insert:  The maximum number of entries to scan should be ~400
   // (Source:  Personal communication with Michael Mitzenmacher;  empirical
@@ -313,7 +313,7 @@ public:
     
     integrity = false;
     oldBuckets = buckets_;
-
+    
     locator.resizeCapacity(capacity);
     buckets_.resize(num_buckets_, empty_bucket);
     
@@ -1025,6 +1025,7 @@ public:
     
     num_buckets_ = nextNbuckets;
     resetMemory();
+    
     locator.resizeCapacity(nextCapacity);
   }
   

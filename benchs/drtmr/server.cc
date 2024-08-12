@@ -21,6 +21,7 @@ using namespace bench;
 #define CLUSTER_HASH_MODE 1
 #define GOOGLE_BTREE_MODE 0
 #define LEARNED_ALEX_MODE 0
+#define DUMMY_INDEX_MODE 0
 
 volatile bool running = true;
 std::atomic<size_t> ready_threads(0);
@@ -43,6 +44,16 @@ using XThread = ::r2::Thread<usize>;   // <usize> represents the return type of 
 
 thread_local char* rpc_large_reply_buf = nullptr;
 thread_local u32 rpc_large_reply_key;
+
+void setup_dummy_index() {
+  packed_data = new packed_data_t(1.2*FLAGS_nkeys);
+  for (uint64_t i = 0; i < FLAGS_nkeys; i++) {
+    KeyType key=exist_keys[i];
+    V addr=packed_data->bulk_load_data(key, sizeof(V), i);
+    r2::compile_fence();
+  }
+  LOG(2) << "Dummy index warmed up...";
+}
 
 void setup_learned_alex_map() {
   packed_data = new packed_data_t(1.2*FLAGS_nkeys);
@@ -79,9 +90,11 @@ void setup_cluster_hash_table() {
     V addr=packed_data->bulk_load_data(key, sizeof(V), i);
     char val[sizeof(V)];
     memcpy(val, &addr, sizeof(V));
-    if (i%100000 == 0)
-      LOG(4) << "cluster insert: " << i;
     cluster_table->Insert(key,reinterpret_cast<void*>(val));
+    if (i%100000 == 0) {
+      auto addr = cluster_table->Get(key);
+      LOG(4) << "cluster insert: " << *addr;
+    }
   }
   LOG(4) << "Cluster hash warmed up..";
 }
@@ -114,6 +127,9 @@ int main(int argc, char **argv) {
   #elif LEARNED_ALEX_MODE
     // setup learned alex ..
     setup_learned_alex_map();
+  #elif DUMMY_INDEX_MODE
+    //setup dummy index ..
+    setup_dummy_index();
   #endif
 
   std::vector<std::unique_ptr<XThread>> workers = 
@@ -211,29 +227,24 @@ auto drtmr_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<
   return std::move(res);
 }
 
-inline void test(const Header& rpc_header, const MemBlock& args, SendTrait* replyc, ReplyValue &reply) {
-  char reply_buf[64];
-  RPCOp op;
-  ASSERT(op.set_msg(MemBlock(reply_buf, 64)).set_reply().add_arg(reply));
-  op.set_corid(rpc_header.cor_id);
-  // LOG(3)<<"GET: " << *(args.interpret_as<u64>());
-  ASSERT(op.execute(replyc) == IOCode::Ok);
-}
 
-ReplyValue test_find(const Header& rpc_header, const MemBlock& args, SendTrait* replyc) {
-  // sanity check the requests
+void drtmr_get_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc) {
+	// sanity check the requests
   ASSERT(args.sz == sizeof(KeyType));
   KeyType key = *(reinterpret_cast<KeyType*>(args.mem_ptr));
 	// GET
 	ValType dummy_value(0);
   #if CLUSTER_HASH_MODE
-    auto addr= *(cluster_table->Get(key));
-    auto length = packed_data->read_data(addr, dummy_value);
+    dummy_value = *(cluster_table->Get(key));
+    //auto length = packed_data->read_data(addr, dummy_value);
   #elif GOOGLE_BTREE_MODE
     auto addr = (*btree_map_instance)[key];
     auto length = packed_data->read_data(addr, dummy_value);
   #elif LEARNED_ALEX_MODE
     auto addr = (*alex_map_instance).at(key);
+    auto length = packed_data->read_data(addr, dummy_value);
+  #elif DUMMY_INDEX_MODE
+    auto addr = key%FLAGS_nkeys;
     auto length = packed_data->read_data(addr, dummy_value);
   #endif
 	ReplyValue reply;
@@ -242,13 +253,6 @@ ReplyValue test_find(const Header& rpc_header, const MemBlock& args, SendTrait* 
   } else {
     reply = { .status = false, .val = dummy_value };
   }
-  return std::move(reply);
-}
-
-void drtmr_get_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc) {
-	ReplyValue reply = test_find(rpc_header,args,replyc);
-  test(rpc_header, args, replyc,reply);
-  /*
   // send
   char reply_buf[64];
   RPCOp op;
@@ -256,7 +260,6 @@ void drtmr_get_callback(const Header& rpc_header, const MemBlock& args, SendTrai
   op.set_corid(rpc_header.cor_id);
   // LOG(3)<<"GET: " << *(args.interpret_as<u64>());
   ASSERT(op.execute(replyc) == IOCode::Ok);
-  */
 }
 
 
@@ -266,9 +269,9 @@ void drtmr_put_callback(const Header& rpc_header, const MemBlock& args, SendTrai
 	KeyType key = *args.interpret_as<KeyType>();
   ValType val = *args.interpret_as<ValType>(sizeof(KeyType));
 	// PUT
-  std::unique_lock<std::mutex> lock(_mutex);
+  //std::unique_lock<std::mutex> lock(_mutex);
   #if CLUSTER_HASH_MODE
-    auto addr= cluster_table->Get(key);
+    /*auto addr= cluster_table->Get(key);
     if (addr != nullptr) {
       auto length = packed_data->update_data(*addr, key, args.sz, val);
     } else {
@@ -276,7 +279,10 @@ void drtmr_put_callback(const Header& rpc_header, const MemBlock& args, SendTrai
       char value[sizeof(V)];
       memcpy(value, &addr, sizeof(V));
       cluster_table->Insert(key,reinterpret_cast<void*>(value));
-    }
+    }*/
+    char value[sizeof(V)];
+    memcpy(value, &val, sizeof(V));
+    cluster_table->Insert(key,reinterpret_cast<void*>(value));
   #elif GOOGLE_BTREE_MODE
     auto it = btree_map_instance->find(key);
     if (it != btree_map_instance->end()) {
@@ -296,7 +302,7 @@ void drtmr_put_callback(const Header& rpc_header, const MemBlock& args, SendTrai
       (*alex_map_instance).insert(key,addr);
     }
   #endif
-  lock.unlock();
+  //lock.unlock();
 
 	ReplyValue reply;
 	// send
@@ -315,22 +321,27 @@ void drtmr_update_callback(const Header& rpc_header, const MemBlock& args, SendT
 	KeyType key = *args.interpret_as<KeyType>();
   ValType val = *args.interpret_as<ValType>(sizeof(KeyType));
 	// UPDATE
-  std::unique_lock<std::mutex> lock(_mutex);
+  //std::unique_lock<std::mutex> lock(_mutex);
 	#if CLUSTER_HASH_MODE
     char value[sizeof(V)];
-    auto addr= *(cluster_table->Get(key));
-    memcpy(value, &addr, sizeof(V));
-    auto length = packed_data->update_data(addr, key, args.sz, val);
+    memcpy(value, &val, sizeof(V));
+    cluster_table->Update(key,reinterpret_cast<void*>(value));
+    //auto addr= *(cluster_table->Insert(key, value));
+    //memcpy(value, &addr, sizeof(V));
+    //auto length = packed_data->update_data(addr, key, args.sz, val);
   #elif GOOGLE_BTREE_MODE
     auto addr = (*btree_map_instance)[key];
     auto length = packed_data->update_data(addr, key, args.sz, val);
   #elif LEARNED_ALEX_MODE
     auto addr = (*alex_map_instance).at(key);
     auto length = packed_data->update_data(addr, key, args.sz, val);
+  #elif DUMMY_INDEX_MODE
+    auto addr = key%FLAGS_nkeys;
+    auto length = packed_data->update_data(addr, key, args.sz, val);
   #endif
-  lock.unlock();
+  //lock.unlock();
 	ReplyValue reply;
-  if(length > 0) {
+  if (true){  //if (length > 0) {
     reply = { .status = true, .val = val };
   } else {
     reply = { .status = false, .val = val };
@@ -350,7 +361,7 @@ void drtmr_remove_callback(const Header& rpc_header, const MemBlock& args, SendT
 	KeyType key = *args.interpret_as<KeyType>();
 	// UPDATE
   bool res(true);
-  _mutex.lock();
+  //_mutex.lock();
 	#if CLUSTER_HASH_MODE
     // Not support in cluster hash emmm
     uint8_t status=0;
@@ -362,8 +373,11 @@ void drtmr_remove_callback(const Header& rpc_header, const MemBlock& args, SendT
     auto addr = (*alex_map_instance).at(key);
     (*alex_map_instance).erase(key);
     auto status = packed_data->remove_data(addr); // status=0, succ
+  #elif DUMMY_INDEX_MODE
+    auto addr = key%FLAGS_nkeys;
+    auto status = packed_data->remove_data(addr); // status=0, succ
   #endif
-  _mutex.lock();
+  //_mutex.lock();
 	ReplyValue reply;
   if(status<=0) {
     reply = { .status = true, .val = 0 };
