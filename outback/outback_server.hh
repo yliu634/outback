@@ -18,7 +18,6 @@ using namespace outback;
 
 /*****  GLOBAL VARIABLES ******/
 std::mutex* mutexArray;
-::rdmaio::RCtrl ctrl(8888);
 std::atomic<size_t> ready_threads(0);
 std::atomic<uint8_t> global_depth(0);
 volatile bool running(true),reconstruct(false);
