@@ -357,6 +357,7 @@ void outback_reconstrcut_table(DirType oldDir, uint64_t _size){ //mb
   ctrl->stop_daemon();
 
   //extendible hashing remove half data from the old table
+  LOG(2) << "start moving half of keys.";
   for (uint32_t row = 0; row < ludo_buckets[oldDir]->size(); row++) {
     for (uint32_t slot = 0; slot < SLOTS_NUM_BUCKET; slot++) {
       if(!ludo_buckets[oldDir]->empty_slot(row,slot)) {// not empty
@@ -368,6 +369,7 @@ void outback_reconstrcut_table(DirType oldDir, uint64_t _size){ //mb
       }
     }
   }
+  LOG(2) << "finish moving half of keys, local depth++";
   local_depths[oldDir]++;
   reconstruct = false;
 }

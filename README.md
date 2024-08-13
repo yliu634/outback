@@ -23,7 +23,7 @@ $ make
 
 ### Run
 ```
-sudo ./bench/outback/server --nkeys=100000 --mem_threads=2
-sudo ./bench/outback/client --server_addr=192.168.1.2:8888 --nkeys=100000 --mem_threads=2 --threads=16
+sudo ./benchs/outback/server --nkeys=100000 --mem_threads=2
+sudo ./benchs/outback/client --server_addr=192.168.1.2:8888 --nkeys=100000 --mem_threads=2 --threads=16
 ```
 
