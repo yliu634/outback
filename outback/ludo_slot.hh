@@ -71,10 +71,18 @@ public:
         }
         return 3;
     }
-
+    
     auto inline read_addr(size_t row, uint8_t slot) -> AddrType {
         AddrType addr = toAddr(bucketsArray[row].slots[slot]);
         return std::move(addr);
+    }
+
+    auto inline empty_slot(const size_t row, const size_t slot) -> bool {
+        return toLength(bucketsArray[row].slots[slot]);
+    }
+
+    auto remove_mark_slot(size_t row, uint8_t slot) -> void {
+        bucketsArray[row].slots[slot] &= (~(0xFFFFULL << 40));
     }
 
     auto remove_addr(size_t row, uint8_t slot) -> void {
@@ -108,7 +116,7 @@ public:
         return 0;
     }
 
-    inline auto empty_bucket(const size_t row) -> int {
+    inline auto memset_bucket(const size_t row) -> int {
         //memset(bucketsArray[row].slots,0,4*sizeof(uint64_t));
         for (uint8_t slot = 0; slot < SLOTS_NUM_BUCKET; ++slot) {
             bucketsArray[row].slots[slot] = 0ULL;

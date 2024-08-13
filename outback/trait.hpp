@@ -41,6 +41,7 @@ using K = u64;
 using V = u64;
 using F = u8;
 using S = u8;
+using DirType = u8;
 
 using ludo_seeds_t = LudoSeeds<S>;
 using ludo_buckets_t = LudoBuckets;

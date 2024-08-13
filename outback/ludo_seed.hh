@@ -6,7 +6,7 @@
 #include <atomic>
 
 #include "r2/src/logging.hh"
-#include "race/spinlock.hh"
+//#include "race/spinlock.hh"
 
 namespace outback {
 

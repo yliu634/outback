@@ -137,8 +137,14 @@ auto setup_ludo_table() -> bool {
   }
   LOG(2) << "Ludo slots warmed up...";
 
+  // extendible hashing setup, local_depths map hash prefix 00,01 to the real table index
+  local_depths.assign(8,0);
+  ludo_buckets = new outback::LudoBuckets*[8];
+  for (size_t i = 0; i < 8; ++i) 
+      ludo_buckets[i] = nullptr;
+
   ludo_lookup_unit = new ludo_lookup_t(ludo_maintenance_unit);
-  ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit, ludo_buckets);
+  ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit, ludo_buckets[0]);
   mutexArray = new std::mutex[ludo_lookup_unit->getBucketsNum()];
   LOG(2) << "Ludo slots finished up...";
 
@@ -146,7 +152,7 @@ auto setup_ludo_table() -> bool {
   for (uint64_t i = 0; i < 100; i++) {
     V dummy_value;
     auto loc = ludo_lookup_unit.lookup_slot(i);
-    auto addr = ludo_buckets->read_addr(loc.first, loc.second);
+    auto addr = ludo_buckets[0]->read_addr(loc.first, loc.second);
     // packed_struct_t* packed_struct = reinterpret_cast<packed_struct_t*>(addr);
     packed_data->read_data(addr, dummy_value);
     LOG(3) << "4: "+std::to_string(dummy_value);

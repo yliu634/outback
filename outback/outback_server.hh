@@ -1,5 +1,7 @@
 #pragma once
 
+#include <absl/hash/hash.h>
+
 #include "r2/src/thread.hh"                   /// Thread
 #include "xutils/local_barrier.hh"            /// PBarrier
 #include "ludo/hashutils/hash.h"
@@ -18,14 +20,16 @@ using namespace outback;
 std::mutex* mutexArray;
 ::rdmaio::RCtrl ctrl(8888);
 std::atomic<size_t> ready_threads(0);
+std::atomic<uint8_t> global_depth(0);
 volatile bool running(true),reconstruct(false);
 
 /*****  LUDO BUCKETS AND UNDERLYING DATA *****/
 lru_cache_t* lru_cache;
 ludo_lookup_t* ludo_lookup_unit;  // act like seeds
-outback::ludo_buckets_t* ludo_buckets;
+outback::ludo_buckets_t** ludo_buckets;
 outback::packed_data_t* packed_data;
 std::vector<uint8_t> bucketLocks;
+std::vector<uint8_t> local_depths;
 
 namespace outback {
 
@@ -44,7 +48,7 @@ void outback_put_callback(const Header& rpc_header, const MemBlock& args, SendTr
 void outback_update_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc);
 void outback_remove_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc);
 void outback_scan_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc);
-void outback_reconstrcut_table(uint64_t _size);
+void outback_reconstrcut_table(DirType oldDir, uint64_t _size);
 
 void outback_get_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc) {
 	// sanity check the requests
@@ -53,18 +57,19 @@ void outback_get_callback(const Header& rpc_header, const MemBlock& args, SendTr
   size_t loc = *args.interpret_as<size_t>();
   KeyType key = *args.interpret_as<KeyType>(sizeof(size_t));
 	ValType dummy_value; //store the obtained value
+  DirType dir = 0; //*args.interpret_as<DirType>(sizeof(size_t)+sizeof(KeyType));
 
   ReplyValue reply;
   if (unlikely(reconstruct && bucketLocks[loc/SLOTS_NUM_BUCKET])) {
     reply = { .status = false, .val = 0};
   } else {
-    auto addr = ludo_buckets->read_addr(loc/SLOTS_NUM_BUCKET, loc%SLOTS_NUM_BUCKET);
+    auto addr = ludo_buckets[dir]->read_addr(loc/SLOTS_NUM_BUCKET, loc%SLOTS_NUM_BUCKET);
     auto res = packed_data->read_data(addr,dummy_value);
     // auto res=packed_data->read_data_with_key_check(addr,key,dummy_value);
     if (res) {
       reply = { .status = true, .val = dummy_value};
     } else {
-      auto cache_bit=ludo_buckets->read_cachebit(loc/SLOTS_NUM_BUCKET, loc%SLOTS_NUM_BUCKET);
+      auto cache_bit=ludo_buckets[dir]->read_cachebit(loc/SLOTS_NUM_BUCKET, loc%SLOTS_NUM_BUCKET);
       if (cache_bit) dummy_value=lru_cache->get(key);
       reply = { .status = true, .val = dummy_value };
     }
@@ -88,6 +93,8 @@ void outback_put_callback(const Header& rpc_header, const MemBlock& args, SendTr
   size_t loc = *args.interpret_as<size_t>();
 	KeyType key = *args.interpret_as<KeyType>(sizeof(size_t)); // I think it is start bytes offset
   ValType val = *args.interpret_as<ValType>(sizeof(KeyType)+sizeof(size_t));
+  DirType dir = 0; // *args.interpret_as<DirType>(sizeof(size_t)+sizeof(KeyType)+sizeof(ValType)) 
+                      // & (1U<<local_depths[dir]-1);
   // LOG(3) << "Put key: " << key;
 
 	// insert
@@ -101,19 +108,19 @@ void outback_put_callback(const Header& rpc_header, const MemBlock& args, SendTr
     h.setSeed(ludo_lookup_unit->buckets[row].seed);
     uint8_t slot=uint8_t(h(key)>>62);//withthenewest seed.
     // uint8_t slot = loc%SLOTS_NUM_BUCKET;
-    int8_t status=ludo_buckets->check_slots(key,row,slot);
+    int8_t status=ludo_buckets[dir]->check_slots(key,row,slot);
     switch (status) {
       case 0: {
         //LOG(4)<<"case 0: "<<key;
         auto addr=packed_data->bulk_load_data(key,sizeof(ValType),val);
-        ludo_buckets->write_addr(key,row,slot,addr);
+        ludo_buckets[dir]->write_addr(key,row,slot,addr);
         reply = { .status = true, .val = 0 };
         // TODO: update to other cNodes
         break;
       }
       case 1: { //update case
         // LOG(4)<<"case 1: "<<key;
-        auto addr = ludo_buckets->read_addr(row,slot);
+        auto addr = ludo_buckets[dir]->read_addr(row,slot);
         KeyType key_;
         packed_data->read_key(addr, key_);
         // LOG(3)<< "key_ is: "<< key_ << " while key is: "<< key;
@@ -135,14 +142,14 @@ void outback_put_callback(const Header& rpc_header, const MemBlock& args, SendTr
         bool success;
         // LOG(4)<<"case 2: "<<key;
         // the actual bucket_addrs returned are the whole uint64_ts
-        std::vector<uint64_t> bucket_addrs = ludo_buckets->read_bucket_addrs(row); 
+        std::vector<uint64_t> bucket_addrs = ludo_buckets[dir]->read_bucket_addrs(row); 
         // key check here(?), yes, checked before switch
         std::vector<KeyType> bucket_keys = packed_data->read_batch_keys(bucket_addrs); 
         // write a distinct data into underlying data
         auto addr=packed_data->bulk_load_data(key,sizeof(ValType),val);
         // try to find a seed to resolve them
         bucket_keys.push_back(key);
-        bucket_addrs.push_back(combine(ludo_buckets->fingerprint(key),64,addr));
+        bucket_addrs.push_back(combine(ludo_buckets[dir]->fingerprint(key),64,addr));
         assert(bucket_keys.size() <= 4);
         uint8_t seed = 0;
         for (; seed < 255; ++seed) {
@@ -160,10 +167,10 @@ void outback_put_callback(const Header& rpc_header, const MemBlock& args, SendTr
           }
           if (success) {
             ludo_lookup_unit->buckets[row].seed = seed;
-            ludo_buckets->empty_bucket(row);
+            ludo_buckets[dir]->memset_bucket(row);
             for (char s = 0; s < bucket_keys.size(); ++s) {
               uint8_t i = uint8_t(h(bucket_keys[s]) >> 62);
-              ludo_buckets->write_cell(row, i, bucket_addrs[s]);  //whole uint64_t
+              ludo_buckets[dir]->write_cell(row, i, bucket_addrs[s]);  //whole uint64_t
             }
             break;
           }
@@ -183,14 +190,14 @@ void outback_put_callback(const Header& rpc_header, const MemBlock& args, SendTr
           lru_cache->insert(key,val);
           auto addr=packed_data->bulk_load_data(key,sizeof(ValType),val);
           // remote cache bit set to 1
-          ludo_buckets->set_cachebit(row,loc%SLOTS_NUM_BUCKET);
+          ludo_buckets[dir]->set_cachebit(row,loc%SLOTS_NUM_BUCKET);
           reply = { .status = true, .val = 3 };
           LOG(3) << "current lru cache size: " << lru_cache->size();
         } else if (lru_cache->size()>=lru_cache->getMaxSize()) { //rebuild needed
           LOG(3) << "lru cache size reaches mx size, and reconstrcut start:";
           if (!reconstruct) {
             reconstruct = true;
-            std::thread reconstrcut_thread(outback_reconstrcut_table, 50);
+            std::thread reconstrcut_thread(outback_reconstrcut_table, dir, 50);
             reconstrcut_thread.detach(); //rebuild it.
           }
           reply = { .status = false, .val = 3 };
@@ -219,6 +226,7 @@ void outback_update_callback(const Header& rpc_header, const MemBlock& args, Sen
   size_t loc = *args.interpret_as<size_t>();
 	KeyType key = *args.interpret_as<KeyType>(sizeof(size_t));
   ValType val = *args.interpret_as<ValType>(sizeof(KeyType)+sizeof(size_t));
+  DirType dir = 0; //*args.interpret_as<DirType>(sizeof(size_t)+sizeof(KeyType)+sizeof(ValType));
   size_t row=loc/SLOTS_NUM_BUCKET;
 	// UPDATE
   ReplyValue reply;
@@ -226,7 +234,7 @@ void outback_update_callback(const Header& rpc_header, const MemBlock& args, Sen
     reply = { .status = false, .val = 0};
   } else {
     std::unique_lock<std::mutex> lock(mutexArray[row]);
-    auto addr = ludo_buckets->read_addr(row,loc%SLOTS_NUM_BUCKET);
+    auto addr = ludo_buckets[dir]->read_addr(row,loc%SLOTS_NUM_BUCKET);
     KeyType key_;
     packed_data->read_key(addr, key_);
     ReplyValue reply;
@@ -254,12 +262,13 @@ void outback_remove_callback(const Header& rpc_header, const MemBlock& args, Sen
   ASSERT(args.sz == sizeof(KeyType)+sizeof(size_t));
   size_t loc=*args.interpret_as<size_t>();
   KeyType key=*args.interpret_as<KeyType>(sizeof(size_t));
+  DirType dir = 0; //*args.interpret_as<DirType>(sizeof(size_t)+sizeof(KeyType));
 	// UPDATE
   size_t row = loc/SLOTS_NUM_BUCKET;
   std::unique_lock<std::mutex> lock(mutexArray[row]);
-  auto addr=ludo_buckets->read_addr(row, loc%SLOTS_NUM_BUCKET);
+  auto addr=ludo_buckets[dir]->read_addr(row, loc%SLOTS_NUM_BUCKET);
   auto res=packed_data->remove_data_with_key_check(addr, key);
-  if (res) ludo_buckets->remove_addr(row, loc%SLOTS_NUM_BUCKET);
+  if (res) ludo_buckets[dir]->remove_addr(row, loc%SLOTS_NUM_BUCKET);
   //else {
   //  //TODO: go to check cache or just back.
   //}
@@ -278,6 +287,7 @@ void outback_scan_callback(const Header& rpc_header, const MemBlock& args, SendT
   ASSERT(args.sz == sizeof(KeyType)+sizeof(u64));
 	KeyType key = *args.interpret_as<KeyType>();
   ValType n = *args.interpret_as<ValType>(sizeof(KeyType));
+  DirType dir = 0; //*args.interpret_as<DirType>(sizeof(size_t)+sizeof(KeyType));
 	// UPDATE
   std::vector<V> result;
   
@@ -297,7 +307,7 @@ DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
 DEFINE_int64(magic_num, 0x6e, "The magic number read by the client");
 DEFINE_int64(clts_num, 0x01, "The client number reads new seeds here.");
-void outback_reconstrcut_table(uint64_t _size){ //mb
+void outback_reconstrcut_table(DirType oldDir, uint64_t _size){ //mb
   LOG(2) << "Outback reconstruction for Outback starts...";
   ASSERT(reconstruct);
   RCtrl* ctrl = new RCtrl(8890);
@@ -316,11 +326,17 @@ void outback_reconstrcut_table(uint64_t _size){ //mb
 
   // TODO: recalculate all the seeds 
   // othello only needs to copy 49-53 lines variables, especially mem
-  {
-    //std::this_thread::sleep_for(std::chrono::seconds(60));
+  //{
+    //std::this_thread::sleep_for(std::chrono::seconds(60));//extendible hashing depths
     LOG(3) << "recompute othello and ludo with: " << exist_keys.size() << " keys";
-    ludo_maintenance_t ludo_maintenance_unit(FLAGS_nkeys,false,exist_keys,exist_keys);
-  }
+    //ludo_maintenance_t ludo_maintenance_unit(FLAGS_nkeys,false,exist_keys,exist_keys);
+    ludo_maintenance_t ludo_maintenance_unit(FLAGS_nkeys,false,
+        std::vector<KeyType>(exist_keys.begin(), exist_keys.begin() + exist_keys.size()/2),
+        std::vector<KeyType>(exist_keys.begin(), exist_keys.begin() + exist_keys.size()/2));
+    //DirType newDir = oldDir+(1U<<(global_depth++));
+    ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit,ludo_buckets[global_depth++]);
+  //}
+
   lru_cache->clear();
   asm volatile ("" ::: "memory");
   auto &seeds = ludo_lookup_unit->buckets;
@@ -339,6 +355,20 @@ void outback_reconstrcut_table(uint64_t _size){ //mb
   LOG(2) << "all clients copied them away.";
   std::fill(bucketLocks.begin(), bucketLocks.end(), 0);
   ctrl->stop_daemon();
+
+  //extendible hashing remove half data from the old table
+  for (uint32_t row = 0; row < ludo_buckets[oldDir]->size(); row++) {
+    for (uint32_t slot = 0; slot < SLOTS_NUM_BUCKET; slot++) {
+      if(!ludo_buckets[oldDir]->empty_slot(row,slot)) {// not empty
+        KeyType key;
+        packed_data->read_key(ludo_buckets[oldDir]->read_addr(row,slot),key); //read data key
+        if (absl::HashOf(key)&(1U<<local_depths[oldDir])) { // hash to see if it needs to be moved
+          ludo_buckets[oldDir]->remove_mark_slot(row,slot); // move it
+        }
+      }
+    }
+  }
+  local_depths[oldDir]++;
   reconstruct = false;
 }
 
