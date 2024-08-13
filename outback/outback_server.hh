@@ -48,7 +48,7 @@ void outback_put_callback(const Header& rpc_header, const MemBlock& args, SendTr
 void outback_update_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc);
 void outback_remove_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc);
 void outback_scan_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc);
-void outback_reconstrcut_table(DirType oldDir, uint64_t _size);
+void outback_reconstruct_table(DirType oldDir, uint64_t _size);
 
 void outback_get_callback(const Header& rpc_header, const MemBlock& args, SendTrait* replyc) {
 	// sanity check the requests
@@ -197,7 +197,7 @@ void outback_put_callback(const Header& rpc_header, const MemBlock& args, SendTr
           LOG(3) << "lru cache size reaches mx size, and reconstrcut start:";
           if (!reconstruct) {
             reconstruct = true;
-            std::thread reconstrcut_thread(outback_reconstrcut_table, dir, 50);
+            std::thread reconstrcut_thread(outback_reconstruct_table, dir, 50);
             reconstrcut_thread.detach(); //rebuild it.
           }
           reply = { .status = false, .val = 3 };
@@ -307,7 +307,7 @@ DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
 DEFINE_int64(magic_num, 0x6e, "The magic number read by the client");
 DEFINE_int64(clts_num, 0x01, "The client number reads new seeds here.");
-void outback_reconstrcut_table(DirType oldDir, uint64_t _size){ //mb
+void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
   LOG(2) << "Outback reconstruction for Outback starts...";
   ASSERT(reconstruct);
   RCtrl* ctrl = new RCtrl(8890);
