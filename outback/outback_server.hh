@@ -18,6 +18,7 @@ using namespace outback;
 
 /*****  GLOBAL VARIABLES ******/
 std::mutex* mutexArray;
+::rdmaio::RCtrl ctrl(8888);
 std::atomic<size_t> ready_threads(0);
 std::atomic<uint8_t> global_depth(0);
 volatile bool running(true),reconstruct(false);
@@ -309,18 +310,18 @@ DEFINE_int64(clts_num, 0x01, "The client number reads new seeds here.");
 void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
   LOG(2) << "Outback reconstruction for Outback starts...";
   ASSERT(reconstruct);
-  RCtrl* ctrl = new RCtrl(8890);
+  RCtrl* rctrl = new RCtrl(8890);
   auto nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_use_nic_idx)).value();
-  RDMA_ASSERT(ctrl->opened_nics.reg(FLAGS_reg_nic_name, nic));
+  RDMA_ASSERT(rctrl->opened_nics.reg(FLAGS_reg_nic_name, nic));
   // allocate a memory (with 1024 bytes) so that remote QP can access it
-  RDMA_ASSERT(ctrl->registered_mrs.create_then_reg(
+  RDMA_ASSERT(rctrl->registered_mrs.create_then_reg(
       FLAGS_reg_mem_name, Arc<RMem>(new RMem(_size*1024*1024)), //64*FLAGS_nkeys)), //FLAGS_threads*2*1024*1024
-      ctrl->opened_nics.query(FLAGS_reg_nic_name).value()));
+      rctrl->opened_nics.query(FLAGS_reg_nic_name).value()));
   // initialzie the value so as client can sanity check its content
-  char *reg_mem = (char *)(ctrl->registered_mrs.query(FLAGS_reg_mem_name).value()->get_reg_attr().value().buf);
+  char *reg_mem = (char *)(rctrl->registered_mrs.query(FLAGS_reg_mem_name).value()->get_reg_attr().value().buf);
   RDMA_LOG(2) << "outback registered memory start addr is: " << (u64) reg_mem;
   std::memset(reg_mem, 0, sizeof(uint64_t)); // set how many clients will read it out, first set 0 as not available
-  ctrl->start_daemon();
+  rctrl->start_daemon();
   LOG(3) << "setup one-sided rdma server.";
 
   // TODO: recalculate all the seeds 
@@ -353,7 +354,7 @@ void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
   std::this_thread::sleep_for(std::chrono::seconds(1)); // even it goes 0, wait to sure they finished
   LOG(2) << "all clients copied them away.";
   std::fill(bucketLocks.begin(), bucketLocks.end(), 0);
-  ctrl->stop_daemon();
+  rctrl->stop_daemon();
 
   //extendible hashing remove half data from the old table
   LOG(2) << "start moving half of keys.";
