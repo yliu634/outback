@@ -146,6 +146,7 @@ auto setup_ludo_table() -> bool {
   ludo_lookup_unit = new ludo_lookup_t(ludo_maintenance_unit);
   ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit, ludo_buckets[0]);
   mutexArray = new std::mutex[ludo_lookup_unit->getBucketsNum()];
+  bucketLocks.resize(ludo_lookup_unit->getBucketsNum());
   LOG(2) << "Ludo slots finished up...";
 
   #if DEBUG_MODE_CHECK
