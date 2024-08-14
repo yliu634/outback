@@ -11,26 +11,26 @@ cd outback
 
 ### Test RNIC 
 * CloudLab r650 (~92.57Gbits):
-    *server:
+    * server:
         ```
-        *sudo ifconfig ens2f0 192.168.1.2 netmask 255.255.0.0
-        *ib_write_bw -d mlx5_2 -i 1 -D 10 --report_gbits
+        * sudo ifconfig ens2f0 192.168.1.2 netmask 255.255.0.0
+        * ib_write_bw -d mlx5_2 -i 1 -D 10 --report_gbits
         ```
-    *client:
+    * client:
         ```
-        *sudo ifconfig ens2f0 192.168.1.0 netmask 255.255.0.0
-        *ib_write_bw 192.168.1.2 -d mlx5_2 -i 1 -D 10 --report_gbits
+        * sudo ifconfig ens2f0 192.168.1.0 netmask 255.255.0.0
+        * ib_write_bw 192.168.1.2 -d mlx5_2 -i 1 -D 10 --report_gbits
         ```
 * Cloudlab r320 (~55.52Gbits):
-    *server:
+    * server:
         ```
-        *sudo ifconfig ibp8s0 192.168.1.2 netmask 255.255.0.0
-        *ib_write_bw --report_gbits
+        * sudo ifconfig ibp8s0 192.168.1.2 netmask 255.255.0.0
+        * ib_write_bw --report_gbits
         ```
-    *client:
+    * client:
         ```
-        *sudo ifconfig ibp8s0 192.168.1.0 netmask 255.255.0.0
-        *ib_write_bw 192.168.1.2 -d mlx4_0 -i 1 -D 10 --report_gbits
+        * sudo ifconfig ibp8s0 192.168.1.0 netmask 255.255.0.0
+        * ib_write_bw 192.168.1.2 -d mlx4_0 -i 1 -D 10 --report_gbits
         ```
 
 ### Run Hash Table Resizing
@@ -38,12 +38,11 @@ Server:
 ```
 sudo ./benchs/outback/server --nic_idx=2 --nkeys=10000000 --mem_threads=1 --seconds=120 --workloads=ycsbd
 ```
-Client:
+Client: 
 ``` 
 sudo ./benchs/outback/client --nic_idx=2 --server_addr=192.168.1.2:8888 --nkeys=100000 --mem_threads=1 --threads=16 --threads=1 --coros=1 --seconds=120
-``
+```
 Note that if you use r320, the ```nic_idx``` should be set as 0, also parameter ```mem_threads``` should be the same in both client and server. 
 
 workloads insert
-
 nix_idx
