@@ -11,27 +11,27 @@ cd outback
 
 ### Test RNIC 
 * CloudLab r650 (~92.57Gbits):
-    * server:
-        ```
-        * sudo ifconfig ens2f0 192.168.1.2 netmask 255.255.0.0
-        * ib_write_bw -d mlx5_2 -i 1 -D 10 --report_gbits
-        ```
-    * client:
-        ```
-        * sudo ifconfig ens2f0 192.168.1.0 netmask 255.255.0.0
-        * ib_write_bw 192.168.1.2 -d mlx5_2 -i 1 -D 10 --report_gbits
-        ```
+    ```
+    server:
+    sudo ifconfig ens2f0 192.168.1.2 netmask 255.255.0.0
+    ib_write_bw -d mlx5_2 -i 1 -D 10 --report_gbits
+    ```
+    ```
+    client:
+    sudo ifconfig ens2f0 192.168.1.0 netmask 255.255.0.0
+    ib_write_bw 192.168.1.2 -d mlx5_2 -i 1 -D 10 --report_gbits
+    ```
 * Cloudlab r320 (~55.52Gbits):
-    * server:
-        ```
-        * sudo ifconfig ibp8s0 192.168.1.2 netmask 255.255.0.0
-        * ib_write_bw --report_gbits
-        ```
-    * client:
-        ```
-        * sudo ifconfig ibp8s0 192.168.1.0 netmask 255.255.0.0
-        * ib_write_bw 192.168.1.2 -d mlx4_0 -i 1 -D 10 --report_gbits
-        ```
+    ```
+    server:
+    sudo ifconfig ibp8s0 192.168.1.2 netmask 255.255.0.0
+    ib_write_bw --report_gbits
+    ```
+    ```
+    client:
+    sudo ifconfig ibp8s0 192.168.1.0 netmask 255.255.0.0
+    ib_write_bw 192.168.1.2 -d mlx4_0 -i 1 -D 10 --report_gbits
+    ```
 
 ### Run Hash Table Resizing
 Server:
