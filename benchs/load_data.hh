@@ -185,8 +185,8 @@ void lognormal_data(){
 }
 
 void load_ycsb() {
+  #define NON_EXIST_KEYS 0
   exist_keys.reserve(BenConfig.nkeys);
-  nonexist_keys.reserve(BenConfig.non_nkeys);
   size_t item_num = 0;
   workload.Init(BenConfig.nkeys, 
                 BenConfig.bench_nkeys,
@@ -206,6 +206,8 @@ void load_ycsb() {
     bench_keys.push_back(dummy_key);
     item_num ++;
   }
+  #if NON_EXIST_KEYS
+  nonexist_keys.reserve(BenConfig.non_nkeys);
   item_num = 0;
   while (item_num < BenConfig.non_nkeys) {
     std::string key_char = workload.NextSequenceKey();
@@ -213,6 +215,7 @@ void load_ycsb() {
     nonexist_keys.push_back(dummy_key);
     item_num ++;
   }
+  #endif
   LOG(3)<<"load ycsb exist_keys number : " << exist_keys.size();
   LOG(3)<<"load ycsb non_exist_keys number : " << nonexist_keys.size();
   LOG(3)<<"load bench_keys number : " << bench_keys.size();

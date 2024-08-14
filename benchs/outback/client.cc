@@ -194,7 +194,6 @@ void* rolex_client_worker(void* param) {
   /**
    * @brief Generate test data
    *        Send RPC requests
-   * 
    */
   // used for other schemes // TODO:
   //size_t non_exist_key_n_per_thread = nonexist_keys.size() / BenConfig.threads;
