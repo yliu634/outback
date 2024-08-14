@@ -83,6 +83,7 @@ public:
 
     auto remove_mark_slot(size_t row, uint8_t slot) -> void {
         bucketsArray[row].slots[slot] &= (~(0xFFFFULL << 40));
+        //ASSERT(!toLength(bucketsArray[row].slots[slot]));
     }
 
     auto remove_addr(size_t row, uint8_t slot) -> void {

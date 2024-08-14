@@ -334,7 +334,7 @@ void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
         std::vector<KeyType>(exist_keys.begin(), exist_keys.begin() + exist_keys.size()/2),
         std::vector<KeyType>(exist_keys.begin(), exist_keys.begin() + exist_keys.size()/2));
     //DirType newDir = oldDir+(1U<<(global_depth++));
-    ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit,ludo_buckets[global_depth++]);
+    ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit,ludo_buckets[++global_depth]);
   //}
 
   lru_cache->clear();
@@ -360,7 +360,7 @@ void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
   LOG(2) << "start moving half of keys.";
   for (uint32_t row = 0; row < ludo_buckets[oldDir]->size(); row++) {
     for (uint32_t slot = 0; slot < SLOTS_NUM_BUCKET; slot++) {
-      if(!ludo_buckets[oldDir]->empty_slot(row,slot)) {// not empty
+      if(ludo_buckets[oldDir]->empty_slot(row,slot) <= 0) {// not empty
         KeyType key;
         packed_data->read_key(ludo_buckets[oldDir]->read_addr(row,slot),key); //read data key
         if (absl::HashOf(key)&(1U<<local_depths[oldDir])) { // hash to see if it needs to be moved
