@@ -101,9 +101,9 @@ public:
 
     inline std::vector<AddrType> read_bucket_addrs(size_t row) {
         std::vector<AddrType> addrs;
-        for (int slot = 0; slot < SLOTS_NUM_BUCKET; slot++) {
+        for (uint slot = 0; slot < SLOTS_NUM_BUCKET; slot++) {
             if (toLength(bucketsArray[row].slots[slot])) {
-                addrs.push_back(bucketsArray[row].slots[slot]);
+                addrs.push_back(toAddr(bucketsArray[row].slots[slot]));
             }
         }
         return std::move(addrs);
