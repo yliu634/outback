@@ -70,13 +70,7 @@ sudo cp -r /usr/src/gtest/include/gtest /usr/local/include/
 
 # config huge page
 sudo sh -c 'echo 1400 > /proc/sys/vm/nr_hugepages'
-
 cat /proc/meminfo | grep Huge
-# sudo ifconfig ibp8s0 192.168.1.1 netmask 255.255.0.0
-# sudo ifconfig ibp8s0 192.168.1.2 netmask 255.255.0.0
 
-# test for network bandwidth
-# client: ib_write_bw 192.168.1.1 -d mlx4_0 -i 1 -D 10 --report_gbits
-# server: ib_write_bw --report_gbits
 # kill -9 $(lsof -ti :18515)
 

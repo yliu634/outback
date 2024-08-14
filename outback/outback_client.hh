@@ -2,6 +2,7 @@
 
 #include <atomic>
 #include "outback/trait.hpp"
+#include "benchs/load_config.hh"
 #include "benchs/rolex_util_back.hh"
 
 using namespace r2;
@@ -227,13 +228,12 @@ inline auto remote_fetch_and_add(const u64 ac_addr, rdmaio::Arc<rdmaio::qp::RC>&
   RDMA_ASSERT(qp->wait_one_comp() == IOCode::Ok);
 }
 
-DEFINE_int64(use_nic_idx, 0, "Which NIC to create QP");
 DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl in server.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
 void remote_fetch_seeds() {
   RDMA_ASSERT(reconstruct);
   LOG(3) << "enter to ready for remote fetch seeds";
-  auto nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_use_nic_idx)).value();
+  auto nic = RNic::create(RNicInfo::query_dev_names().at(2)).value();
   auto qp = RC::create(nic, QPConfig()).value();
   ConnectManager cm("192.168.1.2:8890");
   if (cm.wait_ready(50000000, 2) == IOCode::Timeout) // wait 50 second for server to ready, retry 2 times

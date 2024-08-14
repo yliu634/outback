@@ -302,7 +302,6 @@ void outback_scan_callback(const Header& rpc_header, const MemBlock& args, SendT
 }
 
 
-DEFINE_int64(use_nic_idx, 0, "Which NIC to create QP");
 DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
 DEFINE_int64(magic_num, 0x6e, "The magic number read by the client");
@@ -311,7 +310,7 @@ void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
   LOG(2) << "Outback reconstruction for Outback starts...";
   ASSERT(reconstruct);
   RCtrl* rctrl = new RCtrl(8890);
-  auto nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_use_nic_idx)).value();
+  auto nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
   RDMA_ASSERT(rctrl->opened_nics.reg(FLAGS_reg_nic_name, nic));
   // allocate a memory (with 1024 bytes) so that remote QP can access it
   RDMA_ASSERT(rctrl->registered_mrs.create_then_reg(

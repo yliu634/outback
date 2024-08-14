@@ -1,29 +1,49 @@
 ## OUTBACK
 built on top of Rolex/XStore/R2..
+Fast and Communication-efficient Index for Key-Value Store on Disaggregated Memory.
 
 ### Build
-1. Dependency
 ```
-MLNX_OFED_LINUX-5.4-1.0.3.0-ubuntu18.04-x86_64
-Abseil-cpp master
-Boost_1.65
-Gflags_2.2.2
-```
-2. Create HugePage
-```
-$ echo 
-```
-3. CMake
-```
-$ mkdir build
-$ cd build
-$ cmake ..
-$ make
+./outback/setup_env.sh
+cd outback
+./build.sh
 ```
 
-### Run
-```
-sudo ./benchs/outback/server --nkeys=100000 --mem_threads=2
-sudo ./benchs/outback/client --server_addr=192.168.1.2:8888 --nkeys=100000 --mem_threads=2 --threads=16
-```
+### Test RNIC 
+* CloudLab r650 (~92.57Gbits):
+    *server:
+        ```
+        *sudo ifconfig ens2f0 192.168.1.2 netmask 255.255.0.0
+        *ib_write_bw -d mlx5_2 -i 1 -D 10 --report_gbits
+        ```
+    *client:
+        ```
+        *sudo ifconfig ens2f0 192.168.1.0 netmask 255.255.0.0
+        *ib_write_bw 192.168.1.2 -d mlx5_2 -i 1 -D 10 --report_gbits
+        ```
+* Cloudlab r320 (~55.52Gbits):
+    *server:
+        ```
+        *sudo ifconfig ibp8s0 192.168.1.2 netmask 255.255.0.0
+        *ib_write_bw --report_gbits
+        ```
+    *client:
+        ```
+        *sudo ifconfig ibp8s0 192.168.1.0 netmask 255.255.0.0
+        *ib_write_bw 192.168.1.2 -d mlx4_0 -i 1 -D 10 --report_gbits
+        ```
 
+### Run Hash Table Resizing
+Server:
+```
+sudo ./benchs/outback/server --nic_idx=2 --nkeys=10000000 --mem_threads=1 --seconds=120 --workloads=ycsbd
+```
+Client:
+``` 
+sudo ./benchs/outback/client --nic_idx=2 --server_addr=192.168.1.2:8888 --nkeys=100000 --mem_threads=1 --threads=16 --threads=1 --coros=1 --seconds=120
+``
+Note that if you use r320, the ```nic_idx``` should be set as 0, also parameter ```mem_threads``` should be the same in both client and server. 
+
+workloads insert
+
+nix_idx

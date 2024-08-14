@@ -138,8 +138,7 @@ void* rolex_client_worker(void* param) {
    * Prepare UD qp: create NIC, UD, allocator, post
    */ 
   // create NIC and qps
-  usize nic_idx = 0;
-  auto nic_for_sender = RNic::create(RNicInfo::query_dev_names().at(nic_idx)).value();
+  auto nic_for_sender = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
   auto ud_qp = UD::create(nic_for_sender, QPConfig()).value();
   // Register the memory
   auto mem_region1 = ::HugeRegion::create(16 * 1024 * 1024).value();
