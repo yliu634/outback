@@ -267,13 +267,12 @@ void remote_fetch_seeds() {
   // start copy data
   uint64_t seeds_num=*reinterpret_cast<int64_t*>(test_buf+8);
   LOG(3) << "seeds number are totally: " << seeds_num;
-  //  *(reinterpret_cast<uint64_t*>(test_buf)) = 0;//
   //  remote_write(0,qp,test_buf,sizeof(uint64_t));//
-  /*for (uint64_t i=0,start_addr=16; i<seeds_num; i++) {
-    remote_read(start_addr,qp,test_buf,sizeof(uint8_t));
-    start_addr += i*sizeof(uint8_t);
-  }*/
-  remote_read(16,qp,test_buf,10*sizeof(uint8_t));
+  //remote_read(16,qp,test_buf,10*sizeof(uint8_t));
+  for (uint64_t start_addr=2; start_addr+1024 < seeds_num; ) {
+    remote_read(start_addr*8,qp,test_buf,1024*sizeof(uint8_t));
+    start_addr += 1024;
+  }
   remote_fetch_and_add(0,qp,test_buf,-1);
   for (uint i =0; i < seeds_num; i++) {
     ludo_lookup_unit->buckets[i].seed = *reinterpret_cast<uint8_t*>(test_buf+i);
