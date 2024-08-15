@@ -335,6 +335,7 @@ void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
         std::vector<KeyType>(exist_keys.begin(), exist_keys.begin() + exist_keys.size()/2));
     //DirType newDir = oldDir+(1U<<(global_depth++));
     ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit,ludo_buckets[++global_depth]);
+    ASSERT(global_depth<9) // for debug
   //}
 
   lru_cache->clear();
