@@ -2,7 +2,7 @@
 
 #include <atomic>
 #include "outback/trait.hpp"
-#include "benchs/load_config.hh"
+//#include "benchs/load_config.hh"
 #include "benchs/rolex_util_back.hh"
 
 using namespace r2;
@@ -228,15 +228,17 @@ inline auto remote_fetch_and_add(const u64 ac_addr, rdmaio::Arc<rdmaio::qp::RC>&
   RDMA_ASSERT(qp->wait_one_comp() == IOCode::Ok);
 }
 
+DEFINE_uint64(nic_idx, 2, "Which NIC to create QP");
 DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl in server.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
+DEFINE_int32(reg_nic_port, 8890, "The port number to do seeds fetch.");
 void remote_fetch_seeds() {
   RDMA_ASSERT(reconstruct);
   LOG(3) << "enter to ready for remote fetch seeds";
-  auto nic = RNic::create(RNicInfo::query_dev_names().at(2)).value();
+  auto nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
   auto qp = RC::create(nic, QPConfig()).value();
-  ConnectManager cm("192.168.1.2:8890");
-  if (cm.wait_ready(50000000, 2) == IOCode::Timeout) // wait 50 second for server to ready, retry 2 times
+  ConnectManager cm("192.168.1.2:"+std::to_string(FLAGS_reg_nic_port++));
+  if (cm.wait_ready(5000000, 2) == IOCode::Timeout) // wait 50 second for server to ready, retry 2 times
     RDMA_ASSERT(false) << "cm connect to server timeout";
   auto qp_res = cm.cc_rc("client-qp-"+std::to_string(0), qp, FLAGS_reg_nic_name, QPConfig());
   RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
@@ -264,10 +266,14 @@ void remote_fetch_seeds() {
   // start copy data
   uint64_t seeds_num=*reinterpret_cast<int64_t*>(test_buf+8);
   LOG(3) << "seeds number are totally: " << seeds_num;
-  remote_fetch_and_add(0,qp,test_buf,-1);
   //  *(reinterpret_cast<uint64_t*>(test_buf)) = 0;//
   //  remote_write(0,qp,test_buf,sizeof(uint64_t));//
-  remote_read(16,qp,test_buf,seeds_num*sizeof(uint8_t));
+  /*for (uint64_t i=0,start_addr=16; i<seeds_num; i++) {
+    remote_read(start_addr,qp,test_buf,sizeof(uint8_t));
+    start_addr += i*sizeof(uint8_t);
+  }*/
+  remote_read(16,qp,test_buf,10*sizeof(uint8_t));
+  remote_fetch_and_add(0,qp,test_buf,-1);
   for (uint i =0; i < seeds_num; i++) {
     ludo_lookup_unit->buckets[i].seed = *reinterpret_cast<uint8_t*>(test_buf+i);
   }

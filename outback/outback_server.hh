@@ -306,10 +306,11 @@ DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
 DEFINE_int64(magic_num, 0x6e, "The magic number read by the client");
 DEFINE_int64(clts_num, 0x01, "The client number reads new seeds here.");
+DEFINE_int32(reg_nic_port, 8890, "The port number to do seeds fetch.");
 void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
   LOG(2) << "Outback reconstruction for Outback starts...";
   ASSERT(reconstruct);
-  RCtrl* rctrl = new RCtrl(8890);
+  RCtrl* rctrl = new RCtrl(FLAGS_reg_nic_port++);
   auto nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
   RDMA_ASSERT(rctrl->opened_nics.reg(FLAGS_reg_nic_name, nic));
   // allocate a memory (with 1024 bytes) so that remote QP can access it

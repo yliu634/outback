@@ -91,7 +91,6 @@ auto rolex_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<
 
       /**
        * @brief Construct RPC
-       * 
        */
       RPCCore<SendTrait, RecvTrait, SManager> rpc(12);
       {
@@ -127,7 +126,7 @@ auto rolex_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<
 
 auto setup_ludo_table() -> bool {
   packed_data = new packed_data_t(2*FLAGS_nkeys);
-  lru_cache = new lru_cache_t(2048,10);
+  lru_cache = new lru_cache_t(8192,10);
   ludo_maintenance_t ludo_maintenance_unit(1024);
   for (uint64_t i = 0; i < FLAGS_nkeys; i++) {
     KeyType key = exist_keys[i];
@@ -141,7 +140,7 @@ auto setup_ludo_table() -> bool {
   local_depths.assign(8,0);
   ludo_buckets = new outback::LudoBuckets*[8];
   for (size_t i = 0; i < 8; ++i) 
-      ludo_buckets[i] = nullptr;
+    ludo_buckets[i] = nullptr;
 
   ludo_lookup_unit = new ludo_lookup_t(ludo_maintenance_unit);
   ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit, ludo_buckets[0]);

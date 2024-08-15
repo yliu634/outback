@@ -1,5 +1,6 @@
 ## OUTBACK
 built on top of Rolex/XStore/R2..
+
 Fast and Communication-efficient Index for Key-Value Store on Disaggregated Memory.
 
 ### Build
@@ -9,7 +10,7 @@ cd outback
 ./build.sh
 ```
 
-### Test RNIC 
+### Test RNIC
 * CloudLab r650 (~92.57Gbits):
     ```
     server:
@@ -45,4 +46,5 @@ sudo ./benchs/outback/client --nic_idx=2 --server_addr=192.168.1.2:8888 --nkeys=
 Note that if you use r320, the ```nic_idx``` should be set as 0, also parameter ```mem_threads``` should be the same in both client and server. 
 
 workloads insert
+
 nix_idx
