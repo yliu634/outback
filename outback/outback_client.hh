@@ -2,12 +2,13 @@
 
 #include <atomic>
 #include "outback/trait.hpp"
-//#include "benchs/load_config.hh"
+#include "benchs/load_config.hh"
 #include "benchs/rolex_util_back.hh"
 
 using namespace r2;
 using namespace rdmaio;
 using namespace test;
+using namespace bench;
 using namespace xstore::util;
 using namespace xstore::rpc;
 using namespace xstore::transport;
@@ -228,7 +229,7 @@ inline auto remote_fetch_and_add(const u64 ac_addr, rdmaio::Arc<rdmaio::qp::RC>&
   RDMA_ASSERT(qp->wait_one_comp() == IOCode::Ok);
 }
 
-DEFINE_uint64(nic_idx, 2, "Which NIC to create QP");
+
 DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl in server.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
 DEFINE_int32(reg_nic_port, 8890, "The port number to do seeds fetch.");
