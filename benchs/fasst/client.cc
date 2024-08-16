@@ -282,15 +282,12 @@ void* drtmr_client_worker(void* param) {
         while(running) {
           double d = ratio_dis(gen);
           if(d <= BenConfig.read_ratio) {                                                   // search
-            KeyType dummy_key = bench_keys[query_i];
+            //KeyType dummy_key = bench_keys[query_i];
+            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
             auto start_time = std::chrono::high_resolution_clock::now();
             auto res = remote_search(dummy_key, rpc, sender, lkey, R2_ASYNC_WAIT);
             auto end_time = std::chrono::high_resolution_clock::now();
             duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-            query_i++;
-            if (unlikely(query_i == bench_keys.size())) {
-              query_i = 0;
-            }
           } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) {        // insert
             KeyType dummy_key = std::stoull(workload.NextSequenceKey().substr(4));
             auto start_time = std::chrono::high_resolution_clock::now();

@@ -234,7 +234,8 @@ void* rolex_client_worker(void* param) {
         while(running) {
           double d = ratio_dis(gen);
           if(d <= BenConfig.read_ratio) {             // search
-            KeyType dummy_key = bench_keys[query_i];      // latency start;
+            //KeyType dummy_key = bench_keys[query_i];      // latency start;
+            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
             auto start_time = std::chrono::high_resolution_clock::now();    
             auto res = remote_search(dummy_key, rpc, sender, lkey, R2_ASYNC_WAIT);
             auto end_time = std::chrono::high_resolution_clock::now();
