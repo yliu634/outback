@@ -331,11 +331,11 @@ void outback_reconstruct_table(DirType oldDir, uint64_t _size){ //mb
     LOG(3) << "recompute othello and ludo with: " << exist_keys.size() << " keys";
     //ludo_maintenance_t ludo_maintenance_unit(FLAGS_nkeys,false,exist_keys,exist_keys);
     ludo_maintenance_t ludo_maintenance_unit(FLAGS_nkeys,false,
-        std::vector<KeyType>(exist_keys.begin(), exist_keys.begin() + exist_keys.size()/2),
-        std::vector<KeyType>(exist_keys.begin(), exist_keys.begin() + exist_keys.size()/2));
+        std::vector<KeyType>(exist_keys.begin(), exist_keys.begin()+exist_keys.size()/2),
+        std::vector<KeyType>(exist_keys.begin(), exist_keys.begin()+exist_keys.size()/2));
     //DirType newDir = oldDir+(1U<<(global_depth++));
     ludo_lookup_t ludo_lookup_table(ludo_maintenance_unit,ludo_buckets[++global_depth]);
-    ASSERT(global_depth<9) // for debug
+    if (global_depth>=8) exit(0);// for debug
   //}
 
   lru_cache->clear();
