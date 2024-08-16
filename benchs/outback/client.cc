@@ -2,6 +2,7 @@
 #include <gflags/gflags.h>
 
 #include "outback/outback_client.hh"
+
 #include "benchs/load_config.hh"
 #include "benchs/load_data.hh"
 #include "benchs/rolex_util_back.hh"
@@ -138,8 +139,7 @@ void* rolex_client_worker(void* param) {
    * Prepare UD qp: create NIC, UD, allocator, post
    */ 
   // create NIC and qps
-  usize nic_idx = 0;
-  auto nic_for_sender = RNic::create(RNicInfo::query_dev_names().at(nic_idx)).value();
+  auto nic_for_sender = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
   auto ud_qp = UD::create(nic_for_sender, QPConfig()).value();
   // Register the memory
   auto mem_region1 = ::HugeRegion::create(16 * 1024 * 1024).value();
@@ -222,7 +222,7 @@ void* rolex_client_worker(void* param) {
    * @brief using coroutines for testing
    * 
    */ 
-  if(bench::BenConfig.workloads >= YCSB_A){ //NORMAL) {
+  if(bench::BenConfig.workloads >= NORMAL) {
     for(int i=0; i<BenConfig.coros; i++) {
       ssched.spawn([send_buf, &rpc, &sender, &recv_s, lkey, 
                     thread_id, &thread_param,
@@ -233,7 +233,7 @@ void* rolex_client_worker(void* param) {
         std::chrono::microseconds duration(0);
         while(running) {
           double d = ratio_dis(gen);
-          if(d <= BenConfig.read_ratio) {                                         // search
+          if(d <= BenConfig.read_ratio) {             // search
             KeyType dummy_key = bench_keys[query_i];      // latency start;
             auto start_time = std::chrono::high_resolution_clock::now();    
             auto res = remote_search(dummy_key, rpc, sender, lkey, R2_ASYNC_WAIT);
@@ -243,8 +243,9 @@ void* rolex_client_worker(void* param) {
             if (unlikely(query_i == bench_keys.size())) {
               query_i = 0;
             }
-          } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) {             // insert
-            KeyType dummy_key = nonexist_keys[insert_i];
+          } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) {      // insert
+            //KeyType dummy_key=std::stoull(workload.NextSequenceKey().substr(4));
+            KeyType dummy_key=nonexist_keys[insert_i];
             auto start_time = std::chrono::high_resolution_clock::now(); 
             remote_put(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
             auto end_time = std::chrono::high_resolution_clock::now();
@@ -292,22 +293,44 @@ void* rolex_client_worker(void* param) {
         std::chrono::microseconds duration(0);
         while(running) {
           double d = ratio_dis(gen);
-          //KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
-          if(d <= BenConfig.read_ratio) {     // search
-            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
+          if(d <= BenConfig.read_ratio) {             // search
+            KeyType dummy_key = bench_keys[query_i];      // latency start;
             auto start_time = std::chrono::high_resolution_clock::now();    
             auto res = remote_search(dummy_key, rpc, sender, lkey, R2_ASYNC_WAIT);
             auto end_time = std::chrono::high_resolution_clock::now();
             duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-          } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) { // insert
-            KeyType dummy_key = std::stoull(workload.NextSequenceKey().substr(4));
+            query_i++;
+            if (unlikely(query_i == bench_keys.size())) {
+              query_i = 0;
+            }
+          } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) {      // insert
+            KeyType dummy_key=std::stoull(workload.NextSequenceKey().substr(4));
+            //KeyType dummy_key=nonexist_keys[insert_i];
+            auto start_time = std::chrono::high_resolution_clock::now(); 
             remote_put(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
+            auto end_time = std::chrono::high_resolution_clock::now();
+            duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+            insert_i++;
+            if (unlikely(insert_i == nonexist_keys.size())) {
+              insert_i = 0;
+            }
           } else if(d<=BenConfig.read_ratio+BenConfig.insert_ratio+BenConfig.update_ratio) { // update
-            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
+            KeyType dummy_key = bench_keys[update_i];
+            auto start_time = std::chrono::high_resolution_clock::now(); 
             remote_update(dummy_key, dummy_key, rpc, sender, R2_ASYNC_WAIT);
+            auto end_time = std::chrono::high_resolution_clock::now();
+            duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
+            update_i++;
+            if (unlikely(update_i == bench_keys.size())) {
+              update_i = 0;
+            }
           } else {
-            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
+            KeyType dummy_key = bench_keys[remove_i];
             remote_remove(dummy_key, rpc, sender, R2_ASYNC_WAIT);
+            remove_i++;
+            if (unlikely(remove_i == bench_keys.size())) {
+              remove_i = 0;
+            }
           }
           thread_param.throughput++;
           thread_param.latency += static_cast<double>(duration.count());

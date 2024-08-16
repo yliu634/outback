@@ -149,7 +149,7 @@ auto fasst_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<
        */
       // create NIC and QP
       auto thread_id = i;
-      auto nic_for_recv = RNic::create(RNicInfo::query_dev_names().at(0)).value();
+      auto nic_for_recv = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
       auto qp_recv = UD::create(nic_for_recv, QPConfig()).value();
       // prepare UD recv buffer
       auto mem_region = HugeRegion::create(64 * 1024 * 1024).value();

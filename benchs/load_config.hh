@@ -22,6 +22,7 @@ DEFINE_uint64(bench_nkeys, 1, "Number of operations benchmarked for test");
 DEFINE_string(workloads, "normal", "The workloads for evaluation");
 DEFINE_string(dists, "uniform", "The request keys distribution only for ycsb");
 DEFINE_double(zip_const, 0.99, "The default zipfian dist for skewness");
+DEFINE_uint64(nic_idx, 2, "The index of the NIC used on this machine");
 
 // test config
 DEFINE_uint64(mem_threads, 1, "Server threads.");

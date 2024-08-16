@@ -16,7 +16,7 @@
 #define REMOTE_MEMORY_MODE 0
 #define DEBUG_MODE_CHECK 0
 
-DEFINE_int64(use_nic_idx, 0, "Which NIC to create QP");
+//DEFINE_int64(use_nic_idx, 0, "Which NIC to create QP");
 DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
 
@@ -97,7 +97,7 @@ int main(int argc, char **argv) {
   #else
     {
       auto nic =
-          RNic::create(RNicInfo::query_dev_names().at(FLAGS_use_nic_idx)).value();
+          RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
       // register the nic with name 0 to the ctrl
       RDMA_ASSERT(ctrl->opened_nics.reg(FLAGS_reg_nic_name, nic));
     }
