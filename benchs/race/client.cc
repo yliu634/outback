@@ -17,8 +17,6 @@
 #include "benchs/load_data.hh"
 
 #define READ_DATA_MODE 1
-#define QP_NUM 8
-//DEFINE_int64(use_nic_idx, 0, "Which NIC to create QP");
 DEFINE_int64(reg_nic_name, 0, "The name to register an opened NIC at rctrl in server.");
 DEFINE_int64(reg_mem_name, 73, "The name to register an MR at rctrl.");
 
@@ -46,10 +44,9 @@ auto remote_write(const u64 ac_addr, rdmaio::Arc<rdmaio::qp::RC>& qp, char *test
 
 void create_connections(size_t conn_num) {
   // create a local QP to use
-  conn_num = conn_num < QP_NUM? conn_num:QP_NUM;
-  qps = new rdmaio::Arc<rdmaio::qp::RC>[QP_NUM];
-  auth_keys = new rdmaio::u64[QP_NUM];
-  test_bufs = new char*[QP_NUM];
+  qps = new rdmaio::Arc<rdmaio::qp::RC>[conn_num];
+  auth_keys = new rdmaio::u64[conn_num];
+  test_bufs = new char*[conn_num];
   nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
   for (size_t conn_id = 0; conn_id < conn_num; conn_id++) {
     qps[conn_id] = RC::create(nic, QPConfig()).value();
@@ -98,7 +95,7 @@ void run_benchmark(size_t sec) {
   }
 
   running = false;
-  create_connections(8);
+  create_connections(BenConfig.threads);
   for(size_t worker_i = 0; worker_i < BenConfig.threads; worker_i++){
       thread_params[worker_i].thread_id = worker_i;
       thread_params[worker_i].throughput = 0;
@@ -147,8 +144,35 @@ void* race_client_worker(void* param) {
   thread_param_t &thread_param = *(thread_param_t *)param;
   uint32_t thread_id = thread_param.thread_id;
 
-  rdmaio::Arc<rdmaio::qp::RC> qp = qps[thread_id%QP_NUM];
-  char* test_buf = test_bufs[thread_id%QP_NUM];
+  rdmaio::Arc<rdmaio::qp::RC> qp = qps[thread_id];
+  char* test_buf = test_bufs[thread_id];
+  // create the pair QP at server using CM
+  /*
+  ConnectManager cm(FLAGS_server_addr);
+  if (cm.wait_ready(1000000, 2) ==
+      IOCode::Timeout) // wait 1 second for server to ready, retry 2 times
+    RDMA_ASSERT(false) << "cm connect to server timeout";
+
+  auto qp_res = cm.cc_rc("client-qp-"+std::to_string(thread_id+FLAGS_start_threads), qp, FLAGS_reg_nic_name, QPConfig());
+  RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
+  auto key = std::get<1>(qp_res.desc);
+  RDMA_LOG(4) << "client fetch QP authentical key: " << key;
+
+  auto fetch_res = cm.fetch_remote_mr(FLAGS_reg_mem_name);
+  RDMA_ASSERT(fetch_res == IOCode::Ok) << std::get<0>(fetch_res.desc);
+  rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);*/
+
+  // create the local MR for usage, and create the remote MR for usage
+  //auto local_mem = Arc<RMem>(new RMem(1024));
+  //auto local_mr = RegHandler::create(local_mem, nic).value();
+
+  //qp->bind_remote_mr(remote_attr);
+  //qp->bind_local_mr(local_mr->get_reg_attr().value());
+
+  /*This is the example code usage of the fully created RCQP */
+  //char *test_buf = (char *)(local_mem->raw_ptr);
+  //RDMA_LOG(4) << "local registered mem ptr: " << (u64) test_buf;
+
 
   // Starting benchmarking ...
   size_t query_i = 0, insert_i = 0, remove_i = 0, update_i = 0;
@@ -168,8 +192,9 @@ void* race_client_worker(void* param) {
 
   /**
    * @brief using coroutines for testing
+   * 
    */ 
-  if (bench::BenConfig.workloads >= NORMAL) {
+  if(bench::BenConfig.workloads >= YCSB_A){ //NORMAL) {
     for(int i=0; i<BenConfig.coros; i++) {
       ssched.spawn([&qp, test_buf, 
                     thread_id, &thread_param,
@@ -213,8 +238,7 @@ void* race_client_worker(void* param) {
               query_i = 0;
             }
           } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) {  // insert
-            KeyType dummy_key = std::stoull(workload.NextSequenceKey().substr(4));
-            //KeyType dummy_key = nonexist_keys[insert_i];
+            KeyType dummy_key = nonexist_keys[insert_i];
             ValType dummy_value = dummy_key;
             auto start_time = std::chrono::high_resolution_clock::now();
             u64 ac_addr = race_table->remote_lookup(dummy_key, read_size);
@@ -330,7 +354,7 @@ void* race_client_worker(void* param) {
           double d = ratio_dis(gen);
           if(d <= BenConfig.read_ratio) {  // search
             // LOG(4) << "queried key: " << dummy_key;
-            KeyType dummy_key = bench_keys[query_i];
+            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
             auto start_time = std::chrono::high_resolution_clock::now();
             u64 ac_addr = race_table->remote_lookup(dummy_key, read_size);
             auto res = remote_read(ac_addr,qp,test_buf,read_size,R2_ASYNC_WAIT);
@@ -352,14 +376,9 @@ void* race_client_worker(void* param) {
             }
             auto end_time = std::chrono::high_resolution_clock::now();
             duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-            query_i++;
-            if (unlikely(query_i == bench_keys.size())) {
-              query_i = 0;
-            }
           } else if(d <= BenConfig.read_ratio+BenConfig.insert_ratio) {  // insert
             KeyType dummy_key = std::stoull(workload.NextSequenceKey().substr(4));
             ValType dummy_value = dummy_key;
-            auto start_time = std::chrono::high_resolution_clock::now();
             u64 ac_addr = race_table->remote_lookup(dummy_key, read_size);
             uint8_t fp = race_table->fingerprint(dummy_key);
             auto res = remote_read(ac_addr,qp,test_buf,read_size,R2_ASYNC_WAIT);
@@ -407,12 +426,9 @@ void* race_client_worker(void* param) {
               }
               num++;
             }
-            auto end_time = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
           } else if(d<=BenConfig.read_ratio+BenConfig.insert_ratio+BenConfig.update_ratio) {  // update
-            KeyType dummy_key = bench_keys[update_i];
+            KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
             ValType dummy_value = dummy_key;
-            auto start_time = std::chrono::high_resolution_clock::now();
             u64 ac_addr = race_table->remote_lookup(dummy_key, read_size);
             auto res = remote_read(ac_addr, qp, test_buf, read_size, R2_ASYNC_WAIT);
             bool succ(false);
@@ -432,12 +448,6 @@ void* race_client_worker(void* param) {
                 }
               }
               if (succ) break;
-            }
-            auto end_time = std::chrono::high_resolution_clock::now();
-            duration = std::chrono::duration_cast<std::chrono::microseconds>(end_time - start_time);
-            update_i++;
-            if (unlikely(update_i == bench_keys.size())) {
-                update_i = 0;
             }
           } else { // No remove is implemented
             //remote_remove(dummy_key, rpc, sender, R2_ASYNC_WAIT);
