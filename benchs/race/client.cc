@@ -32,9 +32,8 @@ race_hash_t* race_table;
 std::atomic<size_t> ready_threads(0), num(0);
 
 rdmaio::Arc<rdmaio::RNic> nic;
-rdmaio::Arc<rdmaio::qp::RC>* qps;
 rdmaio::u64* auth_keys;
-char** test_bufs;
+
 namespace race {
 
 void run_benchmark(size_t sec);
@@ -42,50 +41,16 @@ void* race_client_worker(void* param);
 auto remote_read(const u64 ac_addr, rdmaio::Arc<rdmaio::qp::RC>& qp, char *test_buf, const u32 read_size, R2_ASYNC) ->::r2::Option<ValType>;
 auto remote_write(const u64 ac_addr, rdmaio::Arc<rdmaio::qp::RC>& qp, char *test_buf, const u32 read_size, R2_ASYNC) ->void;
 
-void create_connections(size_t conn_num) {
-  // create a local QP to use
-  qps = new rdmaio::Arc<rdmaio::qp::RC>[conn_num];
-  auth_keys = new rdmaio::u64[conn_num];
-  test_bufs = new char*[conn_num];
-  nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
-  for (size_t conn_id = 0; conn_id < conn_num; conn_id++) {
-    qps[conn_id] = RC::create(nic, QPConfig()).value();
-    ConnectManager cm(FLAGS_server_addr);
-    if (cm.wait_ready(1000000, 2) == IOCode::Timeout) // wait 1 second for server to ready, retry 2 times
-      RDMA_ASSERT(false) << "cm connect to server timeout";
-    auto qp_res = cm.cc_rc("client-qp-"+std::to_string(conn_id+FLAGS_start_threads), qps[conn_id], FLAGS_reg_nic_name, QPConfig());
-    RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
-    auto key = std::get<1>(qp_res.desc);
-    RDMA_LOG(4) << "client fetch QP authentical key: " << key;
-    auth_keys[conn_id] = key;
-    auto fetch_res = cm.fetch_remote_mr(FLAGS_reg_mem_name);
-    RDMA_ASSERT(fetch_res == IOCode::Ok) << std::get<0>(fetch_res.desc);
-    rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
-    qps[conn_id]->bind_remote_mr(remote_attr);
-    RDMA_LOG(4) << "remote memory addr client gets is: " << (u64) remote_attr.buf;
-
-    // create the local MR for usage, and create the remote MR for usage
-    auto local_mem = Arc<RMem>(new RMem(1024));
-    auto local_mr = RegHandler::create(local_mem, nic).value();
-    qps[conn_id]->bind_local_mr(local_mr->get_reg_attr().value());
-
-    //This is the example code usage of the fully created RCQP 
-    test_bufs[conn_id] = (char *)(local_mem.get()->raw_ptr);
-    RDMA_LOG(4) << "local registered mem ptr: " << (u64) test_bufs[conn_id];
-  }
-}
-
-void remove_connections(size_t conn_num) {
+void remove_connections(size_t nthreads) {
   // finally, some clean up, to delete my created QP at server
-  //for (size_t conn_id = 0; conn_id < conn_num; conn_id++) {
-  //  auto del_res = cm.delete_remote_rc("client-qp-"+std::to_string(conn_id+FLAGS_start_threads), auth_keys[conn_id]);
+  //for (size_t thread_id = 0; thread_id < nthreads; thread_id++) {
+  //  auto del_res = cm.delete_remote_rc("client-qp-"+std::to_string(thread_id+FLAGS_start_threads), auth_keys[thread_id]);
   //  RDMA_ASSERT(del_res == IOCode::Ok)
   //      << "delete remote QP error: " << del_res.desc;
   //}
 }
 
 void run_benchmark(size_t sec) {
-  num = FLAGS_nkeys;
   pthread_t threads[BenConfig.threads];
   thread_param_t thread_params[BenConfig.threads];
   // check if parameters are cacheline aligned
@@ -93,9 +58,10 @@ void run_benchmark(size_t sec) {
       ASSERT ((uint64_t)(&(thread_params[i])) % CACHELINE_SIZE == 0) <<
           "wrong parameter address: " << &(thread_params[i]);
   }
-
   running = false;
-  create_connections(BenConfig.threads);
+  auth_keys = new rdmaio::u64[BenConfig.threads];
+  nic = RNic::create(RNicInfo::query_dev_names().at(FLAGS_nic_idx)).value();
+
   for(size_t worker_i = 0; worker_i < BenConfig.threads; worker_i++){
       thread_params[worker_i].thread_id = worker_i;
       thread_params[worker_i].throughput = 0;
@@ -137,64 +103,53 @@ void run_benchmark(size_t sec) {
   }
   LOG(2)<<"[micro] Throughput(op/s): " << throughput / sec;
 
-  //remove_connections();
 }
 
 void* race_client_worker(void* param) {
   thread_param_t &thread_param = *(thread_param_t *)param;
   uint32_t thread_id = thread_param.thread_id;
 
-  rdmaio::Arc<rdmaio::qp::RC> qp = qps[thread_id];
-  char* test_buf = test_bufs[thread_id];
-  // create the pair QP at server using CM
-  /*
+  auto qp = RC::create(nic, QPConfig()).value();
   ConnectManager cm(FLAGS_server_addr);
-  if (cm.wait_ready(1000000, 2) ==
-      IOCode::Timeout) // wait 1 second for server to ready, retry 2 times
+  if (cm.wait_ready(1000000, 2) == IOCode::Timeout) // wait 1*2 second for server to ready, retry 2 times
     RDMA_ASSERT(false) << "cm connect to server timeout";
-
   auto qp_res = cm.cc_rc("client-qp-"+std::to_string(thread_id+FLAGS_start_threads), qp, FLAGS_reg_nic_name, QPConfig());
   RDMA_ASSERT(qp_res == IOCode::Ok) << std::get<0>(qp_res.desc);
   auto key = std::get<1>(qp_res.desc);
   RDMA_LOG(4) << "client fetch QP authentical key: " << key;
-
+  auth_keys[thread_id] = key;
   auto fetch_res = cm.fetch_remote_mr(FLAGS_reg_mem_name);
   RDMA_ASSERT(fetch_res == IOCode::Ok) << std::get<0>(fetch_res.desc);
-  rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);*/
-
+  rmem::RegAttr remote_attr = std::get<1>(fetch_res.desc);
+  qp->bind_remote_mr(remote_attr);
+  RDMA_LOG(4) << "remote memory addr client gets is: " << (u64) remote_attr.buf;
   // create the local MR for usage, and create the remote MR for usage
-  //auto local_mem = Arc<RMem>(new RMem(1024));
-  //auto local_mr = RegHandler::create(local_mem, nic).value();
+  auto local_mem = Arc<RMem>(new RMem(1024));
+  auto local_mr = RegHandler::create(local_mem, nic).value();
+  qp->bind_local_mr(local_mr->get_reg_attr().value());
 
-  //qp->bind_remote_mr(remote_attr);
-  //qp->bind_local_mr(local_mr->get_reg_attr().value());
+  //This is the example code usage of the fully created RCQP 
+  char* test_buf = (char *)(qp->local_mr.value().buf);
+  RDMA_LOG(4) << "local registered mem ptr: " << (u64) test_buf;
 
-  /*This is the example code usage of the fully created RCQP */
-  //char *test_buf = (char *)(local_mem->raw_ptr);
-  //RDMA_LOG(4) << "local registered mem ptr: " << (u64) test_buf;
-
-
-  // Starting benchmarking ...
-  size_t query_i = 0, insert_i = 0, remove_i = 0, update_i = 0;
-
+  // starting benchmarking
+  size_t query_i(0), insert_i(0), remove_i(0), update_i(0);
   std::random_device rd;
   std::mt19937 gen(rd());
-  std::uniform_real_distribution<> ratio_dis(0, 1);
+  std::uniform_real_distribution<> ratio_dis(0,1);
 
   SScheduler ssched;
 
   LOG(2) << "[micro] Worker: " << thread_id << " Ready.";
-  ready_threads++;
-  V dummy_value = 1234;
+  ready_threads ++;
 
   while (!running)
   ;
 
   /**
    * @brief using coroutines for testing
-   * 
    */ 
-  if(bench::BenConfig.workloads >= YCSB_A){ //NORMAL) {
+  if(bench::BenConfig.workloads >= NORMAL) {
     for(int i=0; i<BenConfig.coros; i++) {
       ssched.spawn([&qp, test_buf, 
                     thread_id, &thread_param,
@@ -353,8 +308,8 @@ void* race_client_worker(void* param) {
           bool found(false);
           double d = ratio_dis(gen);
           if(d <= BenConfig.read_ratio) {  // search
-            // LOG(4) << "queried key: " << dummy_key;
             KeyType dummy_key = std::stoull(workload.NextTransactionKey().substr(4));
+            // LOG(4) << "queried key: " << dummy_key;
             auto start_time = std::chrono::high_resolution_clock::now();
             u64 ac_addr = race_table->remote_lookup(dummy_key, read_size);
             auto res = remote_read(ac_addr,qp,test_buf,read_size,R2_ASYNC_WAIT);
@@ -463,9 +418,6 @@ void* race_client_worker(void* param) {
     }
   }
   ssched.run();
-  /***********************************************************/
-
-  // RDMA_LOG(4) << "client returns: " << thread_id;
   pthread_exit(nullptr);
 
 }
@@ -503,6 +455,7 @@ auto remote_read(const u64 ac_addr,
         .imm_data = 0});
   RDMA_ASSERT(res_s == IOCode::Ok);
   auto res_p = qp->wait_one_comp();
+  R2_YIELD;
   RDMA_ASSERT(res_p == IOCode::Ok);
 
   // RDMA_LOG(4) << "fetch one value from server : 0x" << std::hex <<  *test_buf;
