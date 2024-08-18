@@ -455,7 +455,6 @@ auto remote_read(const u64 ac_addr,
         .imm_data = 0});
   RDMA_ASSERT(res_s == IOCode::Ok);
   auto res_p = qp->wait_one_comp();
-  R2_YIELD;
   RDMA_ASSERT(res_p == IOCode::Ok);
 
   // RDMA_LOG(4) << "fetch one value from server : 0x" << std::hex <<  *test_buf;
