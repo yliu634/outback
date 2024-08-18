@@ -37,11 +37,11 @@ cd outback
 ### Run Hash Table Resizing
 ```
 server:
-sudo ./build/benchs/outback/server --nic_idx=2 --seconds=120 --nkeys=2000000 --mem_threads=1 --workloads=ycsbd
+sudo numactl --physcpubind=0 ./build/benchs/outback/server --nic_idx=2 --seconds=120 --nkeys=2000000 --mem_threads=1 --workloads=ycsbd
 ```
 ``` 
 client: 
-sudo ./build/benchs/outback/client --nic_idx=2 --server_addr=192.168.1.2:8888 --seconds=120 --coros=1 --nkeys=2000000 --bench_nkeys=100000 --mem_threads=1 --threads=8 --workloads=ycsbd
+sudo numactl --physcpubind=0-7 ./build/benchs/outback/client --nic_idx=2 --server_addr=192.168.1.2:8888 --seconds=120 --coros=1 --nkeys=2000000 --bench_nkeys=100000 --mem_threads=1 --threads=8 --workloads=ycsbd
 
 Note that if you use r320, the ```nic_idx``` should be set as 0, also parameter ```mem_threads``` should be the same in both client and server. 
 
