@@ -126,7 +126,7 @@ auto rolex_server_workers(const usize& nthreads) -> std::vector<std::unique_ptr<
 
 auto setup_ludo_table() -> bool {
   packed_data = new packed_data_t(2*FLAGS_nkeys);
-  lru_cache = new lru_cache_t(8192,10);
+  lru_cache = new lru_cache_t(65535,10);
   ludo_maintenance_t ludo_maintenance_unit(1024);
   for (uint64_t i = 0; i < FLAGS_nkeys; i++) {
     KeyType key = exist_keys[i];
