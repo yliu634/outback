@@ -37,11 +37,10 @@ cd outback
 ### Run throughput benchmark
 ```
 server:
-sudo numactl --physcpubind=0 ./build/benchs/outback/server --seconds=120 --nkeys=10000000 --mem_threads=1 --workloads=ycsbc
-
+sudo taskset -c 0 ./build/benchs/outback/server --seconds=120 --nkeys=50000000 --mem_threads=1 --workloads=ycsbc
 ```
 ``` 
 client:
-sudo numactl --physcpubind=0-71 ./build/benchs/outback/client --nic_idx=2 --server_addr=192.168.1.2:8888 --seconds=120 --nkeys=10000000 --bench_nkeys=10000000 --coros=1 --mem_threads=1 --threads=72 --workloads=ycsbc
+sudo taskset -c 0-71 ./build/benchs/outback/client --nic_idx=2 --server_addr=192.168.1.2:8888 --seconds=120 --nkeys=50000000 --bench_nkeys=5000000 --coros=2 --mem_threads=1 --threads=72 --workloads=ycsbc
 ```
-Note that if you use r320, the ```--nic_idx``` should be set as 0, also parameter ```--mem_threads``` should be the same in both client and server. 
+Note that if you use r320, the ```--nic_idx``` should be set as 0, also parameter ```--mem_threads``` should be the same in both client and server, ```numactl --physcpubind=0-71``` may also works. 
