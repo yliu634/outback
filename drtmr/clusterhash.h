@@ -37,7 +37,7 @@
 //paddings for RDMA,may not be needed
 //#define MAX_THREADS    16
 
-#define CLUSTER_H    8
+#define CLUSTER_H    16
 
 class RdmaClusterHash {
 
