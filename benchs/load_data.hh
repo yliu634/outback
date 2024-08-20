@@ -318,22 +318,22 @@ void read_file_data_with_no_duplicate(std::string path) {
 }
 
 void wiki_ts_data() {
-  std::string path="../datasets/wiki_ts_200M_uint64";
+  std::string path="./datasets/wiki_ts_200M_uint64";
   read_file_data_with_no_duplicate(path);
 }
 
 void fb_data() {
-  std::string path="../datasets/fb_200M_uint64";
+  std::string path="./datasets/fb_200M_uint64";
   read_file_data(path);
 }
 
 void osm_data() {
-  std::string path="../datasets/osm_cellids_200M_uint64";
+  std::string path="./datasets/osm_cellids_200M_uint64";
   read_file_data(path);
 }
 
 void book_data() {
-  std::string path="../datasets/books_200M_uint64";
+  std::string path="./datasets/books_200M_uint64";
   read_file_data(path);
 }
 
